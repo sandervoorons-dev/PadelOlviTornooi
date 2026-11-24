@@ -1231,7 +1231,14 @@ function startEditor(){
     const r = generateRound(); if (r){ S.rounds.push(r); S.rounds[0].matches[0].sa = 6; S.rounds[0].matches[0].sb = 4; }
   }
   try { const t = JSON.parse(localStorage.getItem(TKEY)); if (t){ T = t; if (T.running){ clearInterval(tick); tick = setInterval(updateClock, 250); } } } catch(e){}
+  // Link met "#import=<back-upcode>": tornooi met één tik overzetten (de code blijft op dit toestel)
+  if (location.hash.startsWith("#import=")){
+    pendingImport = decodeURIComponent(location.hash.slice(8));
+    try { history.replaceState(null, "", location.pathname + location.search); } catch(e){}
+    tab = "spelers"; confirmAction = "import";
+  }
   render();
+  if (confirmAction === "import"){ const c = document.querySelector(".confirm"); if (c) c.scrollIntoView({block: "center"}); }
   initCloud();
 }
 async function decideRole(){
