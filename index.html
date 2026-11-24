@@ -95,7 +95,9 @@ select.from.late{border-color:var(--warn);color:var(--warn)}
 .court.extra .court-head{background:var(--chip);color:var(--fg)}
 .court.extra{border-style:dashed}
 .fun-note{text-align:center;color:var(--muted);font-size:.85rem;padding:0 14px 12px}
-.prow{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto auto;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.star{width:40px;height:40px;border:0;border-radius:10px;background:transparent;color:var(--line);font-size:1.4rem;line-height:1}
+.star[aria-pressed="true"]{color:#e0a800}
+.prow{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto auto auto;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
 .prow.off{opacity:.55}
 .prow input[type=text]{border-color:transparent;background:transparent;font-weight:600;min-height:40px;padding:6px 8px}
 .prow input[type=text]:focus{border-color:var(--line)}
@@ -109,7 +111,7 @@ select.from.late{border-color:var(--warn);color:var(--warn)}
 @media (max-width:520px){
   .prow{display:flex;flex-wrap:wrap;gap:8px 6px}
   .prow .levels{gap:2px}
-  .prow .present{order:0}.prow input[type=text]{order:1;flex:1 1 55%;min-width:0}.prow .iconbtn{order:2}
+  .prow .present{order:0}.prow input[type=text]{order:1;flex:1 1 55%;min-width:0}.prow .star{order:2}.prow .iconbtn{order:2}
   .prow .pmeta{order:3}.prow .levels{order:4;margin-left:auto}
   .levels button{width:28px}
   .prow .mode{padding:4px 8px}
@@ -598,6 +600,7 @@ function planPool(active, maxCourts, H, roundIdx, w){
   const justRested = id => H.lastRest(id) === roundIdx-1 ? 1 : 0;
   const order = shuffle(active.slice()).sort((x,y) => {
     const j = justRested(x) - justRested(y); if (j) return j;
+    const pr = (P(x).prio ? 1 : 0) - (P(y).prio ? 1 : 0); if (pr) return pr; // voorrang: rust als laatste
     const d = H.played(y) - H.played(x); if (d) return d;
     return H.lastRest(x) - H.lastRest(y);
   });
@@ -648,7 +651,7 @@ function roundStart(i){ const a = toMin(S.startTime); return a === null ? null :
 function planKey(){
   // Het schema blijft geldig zolang aanwezigen, niveaus, instellingen en gespeelde indelingen gelijk blijven
   return JSON.stringify([
-    S.players.map(p => [p.id, p.active, p.rec, p.level, p.from||1]),
+    S.players.map(p => [p.id, p.active, p.rec, p.level, p.from||1, !!p.prio]),
     S.teamSize, S.courts, S.recCourts, S.restCourts, S.levelWeight, totalRounds(),
     S.rounds.map(r => r.matches.map(m => m.a.concat(m.b)).concat(r.rec ? r.rec.matches.map(m => m.a.concat(m.b)) : []))
   ]);
@@ -747,7 +750,7 @@ function renderPlayers(){
   $("#view-spelers").innerHTML = `
     <div class="stack" style="gap:4px"><h2>Spelers</h2>
       <span class="muted small">Tornooi: ${active} aanwezig · ${used} ${used===1?'veld':'velden'}${restN>0?` · ${restN} rust${restN===1?'':'en'} per ronde`:''}${funN?`<br>Recreatie: ${funN} aanwezig${funUsed?` · ${funUsed} ${funUsed===1?'veld':'velden'}`:''}${funUsed&&funRest>0?` · ${funRest} rust${funRest===1?'':'en'} per ronde`:''}${funN&&!funUsed?` · <span style="color:var(--warn)">te weinig om te spelen (${per} nodig)</span>`:''}`:''}</span></div>
-    <p class="muted small" style="margin:0">Tik op <b>Tornooi</b> of <b>Fun</b> bij een speler om te kiezen waar die speelt. Fun-spelers wisselen onderling op het recreatieveld en tellen niet mee in de stand. Komt iemand later? Kies <b>vanaf ronde …</b>: die speler rust tot dan en staat wel al in het schema.</p>
+    <p class="muted small" style="margin:0">Tik op <b>Tornooi</b> of <b>Fun</b> bij een speler om te kiezen waar die speelt. Fun-spelers wisselen onderling op het recreatieveld en tellen niet mee in de stand. Komt iemand later? Kies <b>vanaf ronde …</b>: die speler rust tot dan en staat wel al in het schema. Een gele <b>★</b> geeft voorrang: die speler rust alleen als het echt niet anders kan.</p>
     <div class="legend"><span><b>Niveau:</b></span>${[1,2,3,4,5].map(l=>`<span><b>${l}</b> ${LEVEL_NAMES[l]}</span>`).join("")}</div>
     <div class="plist">${S.players.map(p => `
       <div class="prow ${p.active?'':'off'}">
@@ -758,6 +761,7 @@ function renderPlayers(){
           <select class="from ${(p.from||1)>1?'late':''}" id="from-${p.id}" data-act="from" data-id="${p.id}" aria-label="Speelt vanaf ronde" title="Speelt vanaf ronde">${[1,2,3,4,5,6,7,8].map(n=>`<option value="${n}" ${(p.from||1)===n?'selected':''}>${n===1?'vanaf start':'vanaf r'+n}</option>`).join("")}</select>
         </div>
         <div class="levels" role="group" aria-label="Niveau">${levelBtns(p)}</div>
+        <button class="star" data-act="toggle-prio" data-id="${p.id}" aria-pressed="${!!p.prio}" aria-label="Voorrang voor ${esc(p.name)}" title="Voorrang: speelt zoveel mogelijk">★</button>
         <button class="iconbtn" data-act="del-player" data-id="${p.id}" aria-label="Verwijder ${esc(p.name)}" title="Verwijderen">×</button>
       </div>`).join("") || `<p class="muted">Nog geen spelers. Voeg ze hieronder toe.</p>`}
     </div>
@@ -932,7 +936,7 @@ function renderRound(){
 function playedNote(){
   // Aantal gespeelde wedstrijden (deze ronde meegeteld) van de aanwezige tornooispelers
   const H = historyCounts();
-  const ids = S.players.filter(p => p.active && !p.rec).map(p => p.id);
+  const ids = S.players.filter(p => p.active && !p.rec && !p.prio).map(p => p.id); // spelers met voorrang spelen bewust meer
   if (!ids.length) return "";
   const counts = ids.map(H.played);
   const max = Math.max(...counts), min = Math.min(...counts);
@@ -950,7 +954,7 @@ function renderSchema(){
     .concat(plan.map(r => ({r, st: "gepland"})));
   const total = totalRounds();
   const names = ids => ids.map(id => esc(pname(id))).join(" &amp; ");
-  const tourIds = S.players.filter(p => p.active && !p.rec).map(p => p.id);
+  const tourIds = S.players.filter(p => p.active && !p.rec && !p.prio).map(p => p.id);
 
   // lopende telling: na welke ronde heeft iedereen evenveel gespeeld?
   const run = {}; tourIds.forEach(id => run[id] = 0);
@@ -1111,6 +1115,7 @@ document.addEventListener("click", e => {
   if (VIEW && !["prev-round","next-view","goto-last","matrix-pool","matrix-mode"].includes(act)) return;
   switch(act){
     case "toggle-active": { const p=P(id); p.active=!p.active; save(); render(); break; }
+    case "toggle-prio": { const p=P(id); p.prio=!p.prio; save(); render(); toast(p.prio ? p.name + " speelt nu zoveel mogelijk" : p.name + " speelt weer even vaak als de rest"); break; }
     case "toggle-rec": { const p=P(id); p.rec=!p.rec; save(); render(); break; }
     case "level": { P(id).level = +b.dataset.level; save(); render(); break; }
     case "del-player": {
