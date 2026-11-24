@@ -518,9 +518,17 @@ function ranking(pool){
 
 /* ---------- Indeling: wie speelt met en tegen wie ---------- */
 function historyCounts(){
-  const partner = {}, opp = {}, played = {}, lastRest = {};
+  const partner = {}, opp = {}, played = {}, lastRest = {}, prevOpp = {}, lastCourt = {};
   const k = (a,b) => a < b ? a+"|"+b : b+"|"+a;
+  const lastRi = S.rounds.length - 1;
   S.rounds.forEach((r, ri) => {
+    if (ri === lastRi){
+      // vorige ronde: wie tegen wie speelde en op welk veld
+      [["m", r.matches], ["r", r.rec ? r.rec.matches : []]].forEach(([pre, ms]) => ms.forEach(m => {
+        m.a.concat(m.b).forEach(id => lastCourt[id] = pre + m.court);
+        m.a.forEach(x => m.b.forEach(y => prevOpp[k(x,y)] = 1));
+      }));
+    }
     (r.rest||[]).concat(r.rec ? r.rec.rest : []).forEach(id => lastRest[id] = ri);
     r.matches.concat(r.rec ? r.rec.matches : []).forEach(m => {
       [m.a, m.b].forEach(t => { t.forEach(id => played[id] = (played[id]||0)+1);
@@ -532,7 +540,9 @@ function historyCounts(){
     partner: (a,b) => partner[k(a,b)]||0,
     opp: (a,b) => opp[k(a,b)]||0,
     played: id => played[id]||0,
-    lastRest: id => lastRest[id] === undefined ? -99 : lastRest[id]
+    lastRest: id => lastRest[id] === undefined ? -99 : lastRest[id],
+    prevOpp: (a,b) => !!prevOpp[k(a,b)],
+    lastCourt: id => lastCourt[id]
   };
 }
 function shuffle(a){ for (let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
@@ -544,7 +554,7 @@ function bestSplit(group, H, w){
     let c = 0;
     for (let i=0;i<a.length;i++) for (let j=i+1;j<a.length;j++) c += 300 * H.partner(a[i],a[j]) ** 1.5;
     for (let i=0;i<b.length;i++) for (let j=i+1;j<b.length;j++) c += 300 * H.partner(b[i],b[j]) ** 1.5;
-    a.forEach(x => b.forEach(y => c += 30 * H.opp(x,y)));
+    a.forEach(x => b.forEach(y => c += 30 * H.opp(x,y) + (H.prevOpp(x,y) ? 2000 : 0))); // nooit 2 rondes na elkaar tegen dezelfde
     const sa = a.reduce((s,id)=>s+lv(id),0), sb = b.reduce((s,id)=>s+lv(id),0);
     c += w * 18 * (sa-sb)**2;
     const all = a.concat(b).map(lv);
@@ -567,8 +577,8 @@ function generateRound(){
   const late = p => p.active && (p.from||1) > roundIdx+1;
   const tour = S.players.filter(p => here(p) && !p.rec).map(p => p.id);
   const fun = S.players.filter(p => here(p) && p.rec).map(p => p.id);
-  const main = planPool(tour, S.courts, H, roundIdx, S.levelWeight);
-  const rec = planPool(fun, S.recCourts, H, roundIdx, Math.min(S.levelWeight, 1));
+  const main = planPool(tour, S.courts, H, roundIdx, S.levelWeight, "m");
+  const rec = planPool(fun, S.recCourts, H, roundIdx, Math.min(S.levelWeight, 1), "r");
   if (!main.matches.length && !rec.matches.length) return null;
   const extra = planExtra(main.rest.concat(rec.rest), H); // wie nog niet aanwezig is, speelt ook niet op het rustveld
   main.rest = main.rest.concat(S.players.filter(p => late(p) && !p.rec).map(p => p.id));
@@ -588,7 +598,12 @@ function planExtra(pool, H){
   return {matches};
 }
 
-function planPool(active, maxCourts, H, roundIdx, w){
+function permutations(n){
+  if (n > 6) return [shuffle([...Array(n).keys()])];
+  const out = [], go = (pre, rest) => { if (!rest.length) out.push(pre); rest.forEach((x,i) => go(pre.concat(x), rest.slice(0,i).concat(rest.slice(i+1)))); };
+  go([], [...Array(n).keys()]); return shuffle(out);
+}
+function planPool(active, maxCourts, H, roundIdx, w, pre){
   const ts = S.teamSize, per = ts*2;
   const nCourts = Math.min(maxCourts, Math.floor(active.length / per));
   if (nCourts < 1) return {matches: [], rest: active.slice()};
@@ -630,7 +645,12 @@ function planPool(active, maxCourts, H, roundIdx, w){
     const total = costs.reduce((a,b)=>a+b,0);
     if (!best || total < best.total) best = {total, groups: groups.map(g=>g.slice())};
   }
-  const courtsOrder = shuffle([...Array(nCourts).keys()]);
+  // velden toewijzen: zo weinig mogelijk spelers twee rondes na elkaar op hetzelfde veld
+  let courtsOrder = null, fewest = Infinity;
+  permutations(nCourts).forEach(perm => {
+    const stay = best.groups.reduce((n, g, i) => n + g.filter(id => H.lastCourt(id) === pre + perm[i]).length, 0);
+    if (stay < fewest){ fewest = stay; courtsOrder = perm; }
+  });
   const matches = best.groups.map((g, i) => {
     const sp = bestSplit(g, H, w);
     return {court: courtsOrder[i], a: sp.a, b: sp.b, sa: null, sb: null};
@@ -648,9 +668,11 @@ function totalRounds(){
   return Math.max(1, Math.floor((b - a) / slot));
 }
 function roundStart(i){ const a = toMin(S.startTime); return a === null ? null : toClock(a + i*(S.minutes + S.changeMinutes)); }
+const PLAN_VERSION = 2;
 function planKey(){
   // Het schema blijft geldig zolang aanwezigen, niveaus, instellingen en gespeelde indelingen gelijk blijven
   return JSON.stringify([
+    PLAN_VERSION, // nieuwe indeelregels in de app = schema opnieuw maken
     S.players.map(p => [p.id, p.active, p.rec, p.level, p.from||1, !!p.prio]),
     S.teamSize, S.courts, S.recCourts, S.restCourts, S.levelWeight, totalRounds(),
     S.rounds.map(r => r.matches.map(m => m.a.concat(m.b)).concat(r.rec ? r.rec.matches.map(m => m.a.concat(m.b)) : []))
