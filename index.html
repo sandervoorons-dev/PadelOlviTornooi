@@ -782,12 +782,12 @@ function renderPlayers(){
       <label class="row small" ${artifactCap || ON_GH ? "" : "hidden"}><input type="checkbox" id="setAutoShare" ${S.autoShare?'checked':''} style="width:22px;height:22px"> Bij elke nieuwe ronde automatisch bijwerken voor spelers die meekijken</label>
     </div>
     ${ghPanel()}
-    <details class="panel">
+    <details class="panel" ${["import","reset-rounds","reset-all"].includes(confirmAction) ? "open" : ""}>
       <summary>Bewaren, overzetten en opnieuw beginnen</summary>
       <div class="stack">
         <p class="small muted" style="margin:0">Alles wordt automatisch bewaard op dit toestel${dbRef?' en in je account':''}. Om het tornooi naar een ander toestel over te zetten: kopieer de code en plak ze daar.</p>
         <div class="row"><button class="btn" data-act="export">Kopieer back-upcode</button></div>
-        <textarea id="importBox" placeholder="Plak hier een back-upcode"></textarea>
+        <textarea id="importBox" placeholder="Plak hier een back-upcode">${esc(pendingImport)}</textarea>
         <div class="row"><button class="btn" data-act="import">Back-up terugzetten</button></div>
         ${confirmHtml("import", "Het huidige tornooi wordt vervangen door de back-up.", "Vervangen")}
         <hr style="border:0;border-top:1px solid var(--line);width:100%">
@@ -1147,7 +1147,9 @@ document.addEventListener("click", e => {
     case "ask-del-round": confirmAction="del-round"; render(); break;
     case "ask-reset-rounds": confirmAction="reset-rounds"; render(); break;
     case "ask-reset-all": confirmAction="reset-all"; render(); break;
-    case "import": confirmAction="import"; render(); break;
+    case "import": pendingImport = ($("#importBox").value || "").trim();
+      if (!pendingImport){ toast("Plak eerst een back-upcode in het vak"); break; }
+      confirmAction="import"; render(); break;
     case "confirm-no": confirmAction=null; render(); break;
     case "confirm-yes": {
       const key = b.dataset.key; confirmAction = null;
@@ -1159,7 +1161,8 @@ document.addEventListener("click", e => {
           if (r.rec){ r.rec.rest = r.rec.rest.filter(x=>x!==pendingDel); r.rec.matches = r.rec.matches.filter(m => !m.a.concat(m.b).includes(pendingDel)); }
           if (r.extra){ r.extra.matches = r.extra.matches.filter(m => !m.a.concat(m.b).includes(pendingDel)); } }); }
       if (key==="import"){
-        try { const data = JSON.parse(decodeURIComponent(escape(atob($("#importBox").value.trim()))));
+        try { const data = JSON.parse(decodeURIComponent(escape(atob(pendingImport.replace(/\s+/g, "")))));
+          pendingImport = "";
           if (!data || !Array.isArray(data.players)) throw 0;
           S = Object.assign(baseState(), data); toast("Back-up teruggezet");
         } catch(err){ toast("Deze code klopt niet. Kopieer ze opnieuw volledig."); render(); return; }
@@ -1176,6 +1179,7 @@ document.addEventListener("click", e => {
   }
 });
 let pendingDel = null;
+let pendingImport = "";
 
 $("#clearExample").addEventListener("click", () => { S = baseState({courts:S.courts}); save(); tab="spelers"; render(); });
 
