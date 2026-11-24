@@ -1,0 +1,1251 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Wisselpartner Tornooi</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: één kolom, sticky tabbalk bovenaan; elke ronde = baankaarten met scorebord-steppers. */
+:root{
+  --court:#1d5fa8;      /* padelbaan-blauw */
+  --court-deep:#123f73;
+  --ball:#d9e021;       /* balgeel */
+  --bg:#eef3f8;
+  --surface:#ffffff;
+  --line:#d3dde8;
+  --fg:#14202e;
+  --muted:#5b6b7d;
+  --win:#1f8a4c;
+  --warn:#b8580a;
+  --danger:#c0352b;
+  --chip:#e3ebf4;
+  --font-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --font-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --court:#4b8fdb;--court-deep:#0d2440;--ball:#d9e021;--bg:#0c141e;--surface:#152131;--line:#26374c;
+  --fg:#e7eef6;--muted:#93a4b8;--win:#4cc285;--warn:#f0a057;--danger:#ef6b60;--chip:#1e2e42;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --court:#4b8fdb;--court-deep:#0d2440;--ball:#d9e021;--bg:#0c141e;--surface:#152131;--line:#26374c;
+  --fg:#e7eef6;--muted:#93a4b8;--win:#4cc285;--warn:#f0a057;--danger:#ef6b60;--chip:#1e2e42;color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:16px;line-height:1.45}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--ball);outline-offset:2px}
+
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--court-deep)}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--court-deep);color:#fff;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px 0}
+.top-inner{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:8px}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.brand svg{flex:none}
+.brand h1{font-family:var(--font-display);font-weight:800;font-size:1.5rem;letter-spacing:.02em;margin:0;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand .sync{margin-left:auto;font-size:.75rem;opacity:.75;white-space:nowrap}
+nav.tabs{display:flex;gap:4px}
+nav.tabs button{flex:1;min-width:0;background:none;border:0;color:#cfe0f3;padding:10px 2px 12px;font-family:var(--font-display);font-weight:700;font-size:1.05rem;letter-spacing:.04em;text-transform:uppercase;border-bottom:4px solid transparent}
+nav.tabs button[aria-selected="true"]{color:#fff;border-bottom-color:var(--ball)}
+
+main{max-width:880px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 60px;display:flex;flex-direction:column;gap:18px}
+section[hidden],[hidden]{display:none!important}
+.stack{display:flex;flex-direction:column;gap:14px}
+h2{font-family:var(--font-display);font-weight:800;font-size:1.6rem;margin:0;letter-spacing:.01em;text-wrap:balance}
+h3{font-family:var(--font-display);font-weight:700;font-size:1.2rem;margin:0;letter-spacing:.03em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)}
+.small{font-size:.875rem}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+label.row{flex-wrap:nowrap}
+label.row input[type=checkbox]{flex:none}
+.grow{flex:1;min-width:0}
+
+.btn{border:0;border-radius:10px;padding:12px 18px;font-weight:700;background:var(--chip);min-height:46px}
+.btn.primary{background:var(--court);color:#fff}
+.btn.ball{background:var(--ball);color:#1b2400}
+.btn.danger{background:transparent;color:var(--danger);border:2px solid var(--danger)}
+.btn.ghost{background:transparent;border:2px solid var(--line)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.big{font-size:1.1rem;padding:14px 22px;min-height:54px}
+
+input[type=text],input[type=number],select,textarea{background:var(--surface);border:2px solid var(--line);border-radius:10px;padding:10px 12px;min-height:46px;width:100%}
+textarea{min-height:110px;resize:vertical}
+label.field{display:flex;flex-direction:column;gap:6px;font-weight:600;font-size:.9rem}
+.settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px}
+
+.banner{background:color-mix(in srgb,var(--ball) 28%,var(--surface));border:2px dashed color-mix(in srgb,var(--ball) 70%,var(--fg) 10%);border-radius:14px;padding:14px 16px;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.banner p{margin:0;flex:1;min-width:220px}
+
+/* Spelers */
+.plist{display:flex;flex-direction:column;gap:8px}
+.pmeta{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+select.from{width:auto;min-height:34px;padding:2px 6px;font-size:.8rem;font-weight:600;border-radius:999px;color:var(--muted)}
+select.from.late{border-color:var(--warn);color:var(--warn)}
+.mode{border:2px solid var(--court);background:transparent;color:var(--court);border-radius:999px;padding:4px 10px;font-weight:700;font-size:.8rem;min-height:34px;white-space:nowrap}
+.mode.fun{border-color:var(--warn);color:var(--warn);background:color-mix(in srgb,var(--ball) 25%,transparent)}
+.court.rec .court-head{background:var(--ball);color:#1b2400}
+.court.rec{border-style:dashed}
+.court.extra .court-head{background:var(--chip);color:var(--fg)}
+.court.extra{border-style:dashed}
+.fun-note{text-align:center;color:var(--muted);font-size:.85rem;padding:0 14px 12px}
+.prow{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto auto;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.prow.off{opacity:.55}
+.prow input[type=text]{border-color:transparent;background:transparent;font-weight:600;min-height:40px;padding:6px 8px}
+.prow input[type=text]:focus{border-color:var(--line)}
+.present{width:40px;height:40px;border-radius:50%;border:2px solid var(--line);background:var(--surface);display:grid;place-items:center;font-weight:800}
+.present[aria-pressed="true"]{background:var(--win);border-color:var(--win);color:#fff}
+.levels{display:flex;gap:3px}
+.levels button{width:30px;height:34px;border:0;border-radius:7px;background:var(--chip);font-weight:700;font-size:.85rem;color:var(--muted)}
+.levels button.on{background:var(--court);color:#fff}
+.iconbtn{width:40px;height:40px;border:0;border-radius:10px;background:transparent;color:var(--muted);font-size:1.3rem;line-height:1}
+.iconbtn:hover{background:var(--chip)}
+@media (max-width:520px){
+  .prow{display:flex;flex-wrap:wrap;gap:8px 6px}
+  .prow .levels{gap:2px}
+  .prow .present{order:0}.prow input[type=text]{order:1;flex:1 1 55%;min-width:0}.prow .iconbtn{order:2}
+  .prow .pmeta{order:3}.prow .levels{order:4;margin-left:auto}
+  .levels button{width:28px}
+  .prow .mode{padding:4px 8px}
+  .prow select.from{padding:2px 2px 2px 6px}
+}
+.legend{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:.85rem;color:var(--muted)}
+.legend b{font-family:var(--font-display);color:var(--fg)}
+
+/* Ronde */
+.roundhead{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.roundnav{display:flex;gap:6px;align-items:center}
+.roundnav .iconbtn{border:2px solid var(--line)}
+.timer{display:flex;align-items:center;gap:10px;background:var(--court-deep);color:#fff;border-radius:14px;padding:10px 14px;flex-wrap:wrap}
+.timer .clock{font-family:var(--font-display);font-weight:800;font-size:2.6rem;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:.03em;min-width:5ch}
+.timer.done .clock{color:var(--ball);animation:blink 1s steps(2) infinite}
+.timer .btn{min-height:42px;padding:8px 14px}
+.timer .btn.ghost{color:#fff;border-color:#ffffff55}
+@keyframes blink{50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.timer.done .clock{animation:none}}
+
+.courts{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.court{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;display:flex;flex-direction:column}
+.court-head{background:var(--court);color:#fff;display:flex;justify-content:space-between;align-items:center;padding:8px 14px;font-family:var(--font-display);font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.court-head .state{font-size:.85rem;letter-spacing:.04em;opacity:.9}
+.court.scored .court-head{background:var(--court-deep)}
+.side{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px 14px}
+.side + .vs{border-top:1px dashed var(--line);margin:0 14px;position:relative;height:0}
+.vs span{position:absolute;left:50%;top:-11px;transform:translateX(-50%);background:var(--surface);padding:0 8px;font-family:var(--font-display);font-weight:700;color:var(--muted);font-size:.9rem}
+.names{display:flex;flex-direction:column;gap:2px;min-width:0}
+.names .n{font-weight:700;font-size:1.08rem;overflow-wrap:anywhere}
+.names .lv{font-size:.75rem;color:var(--muted);font-weight:600}
+.side.winner .names .n{color:var(--win)}
+.side.winner .names .n::after{content:" ✓";}
+.stepper{display:flex;align-items:center;gap:4px}
+.stepper button{width:44px;height:44px;border-radius:10px;border:0;background:var(--chip);font-size:1.4rem;font-weight:700}
+.stepper .val{font-family:var(--font-display);font-weight:800;font-size:2rem;min-width:2.2ch;text-align:center;font-variant-numeric:tabular-nums}
+.stepper .val.empty{color:var(--muted);opacity:.6}
+.court-foot{padding:0 14px 12px;display:flex;justify-content:flex-end}
+.linkbtn{background:none;border:0;color:var(--muted);text-decoration:underline;font-size:.85rem;padding:6px}
+.rest{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.chip{background:var(--chip);border-radius:999px;padding:6px 12px;font-weight:600;font-size:.9rem}
+.empty-state{text-align:center;padding:28px 16px}
+.empty-state p{max-width:46ch;margin:8px auto 16px}
+
+/* Stand */
+.tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:10px 10px;text-align:right;white-space:nowrap}
+th{font-family:var(--font-display);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:.85rem;color:var(--muted);border-bottom:2px solid var(--line)}
+td{border-bottom:1px solid var(--line)}
+tr:last-child td{border-bottom:0}
+th.l,td.l{text-align:left}
+td.rank{font-family:var(--font-display);font-weight:800;font-size:1.2rem;width:2.5rem}
+tr.p1 td.rank{color:#b8920a}tr.p2 td.rank{color:#7d8a99}tr.p3 td.rank{color:#a8662e}
+td.main{font-weight:800;font-size:1.05rem}
+td.name{font-weight:700}
+.partners{font-size:.8rem;color:var(--muted);white-space:normal;min-width:180px}
+
+/* Delen en kijkversie */
+.sharebar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.viewer .vhide,.viewer #tab-spelers,.viewer #view-spelers,.viewer #exampleBanner,.viewer #timerBox,.viewer .stepper button,.viewer .court-foot,.viewer .linkbtn,
+.viewer [data-act="new-round"],.viewer [data-act="reshuffle"],.viewer [data-act="replan"],.viewer [data-act="share"]{display:none!important}
+.viewer .row:has(> [data-act="new-round"]){display:none}
+.viewer #view-ronde > p.small,.viewer .court.rec .fun-note{display:none}
+
+/* Schema */
+.sgrid{display:flex;flex-direction:column;gap:12px}
+.sround{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.sround.gepland{border-style:dashed}
+.sround.bezig{border:2px solid var(--court)}
+.shead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;background:var(--chip)}
+.shead b{font-family:var(--font-display);font-size:1.15rem;letter-spacing:.02em}
+.shead .time{font-variant-numeric:tabular-nums;font-weight:700}
+.shead .tag{font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
+.sround.bezig .shead .tag{color:var(--court)}
+.shead .eq{margin-left:auto;color:var(--win);font-weight:700;font-size:.85rem}
+.sboards{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;padding:10px 12px}
+.smatch{border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.smatch .slbl{padding:4px 10px;background:var(--court);color:#fff}
+.smatch.fun .slbl{background:var(--ball);color:#1b2400}
+.smatch.extra{border-style:dashed}
+.smatch.extra .slbl{background:var(--chip);color:var(--muted)}
+.slbl{font-family:var(--font-display);font-weight:700;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.steam{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;padding:6px 10px}
+.steam + .steam{border-top:1px solid var(--line)}
+.snames{display:flex;flex-direction:column;min-width:0;font-weight:600;font-size:.92rem;line-height:1.3}
+.snames span{overflow-wrap:anywhere}
+.sscore{font-family:var(--font-display);font-weight:800;font-size:1.6rem;line-height:1;font-variant-numeric:tabular-nums;min-width:1.4ch;text-align:right}
+.sscore.open{color:var(--muted);opacity:.5;font-size:1.2rem}
+.steam.win .snames,.steam.win .sscore{color:var(--win)}
+.srest{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:0 12px 12px}
+.srest .slbl{color:var(--muted);margin-right:4px}
+.seg{display:inline-flex;border:2px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{border:0;background:transparent;padding:8px 12px;font-weight:700;min-height:40px}
+.seg button[aria-pressed="true"]{background:var(--court);color:#fff}
+table.matrix{width:auto}
+table.matrix th,table.matrix td{padding:6px 7px;text-align:center;font-size:.85rem}
+table.matrix th.l{text-align:left;position:sticky;left:0;background:var(--surface);z-index:1}
+table.matrix td{background:color-mix(in srgb,var(--court) var(--k,0%),transparent);border:1px solid var(--line);min-width:2.2em;font-weight:700}
+table.matrix td.zero{color:var(--muted);font-weight:400}
+table.matrix td.self{background:var(--chip)}
+
+details.panel summary{cursor:pointer;font-weight:700}
+details.panel[open] summary{margin-bottom:12px}
+
+.confirm{display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:color-mix(in srgb,var(--danger) 12%,var(--surface));border:2px solid var(--danger);border-radius:12px;padding:12px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 18px;border-radius:999px;font-weight:600;z-index:20;max-width:90vw}
+</style>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect x="2" y="5" width="26" height="20" rx="2" fill="none" stroke="#fff" stroke-width="2"/><line x1="15" y1="5" x2="15" y2="25" stroke="#fff" stroke-width="2"/><line x1="2" y1="15" x2="28" y2="15" stroke="#fff" stroke-width="1.2" stroke-dasharray="2 2"/><circle cx="22" cy="10" r="3.2" fill="#d9e021"/></svg>
+      <h1 id="title">Wisselpartner Tornooi</h1>
+      <span class="sync" id="sync">lokaal bewaard</span>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" id="tab-spelers" aria-selected="false" data-tab="spelers">Spelers</button>
+      <button role="tab" id="tab-ronde" aria-selected="true" data-tab="ronde">Ronde</button>
+      <button role="tab" id="tab-schema" aria-selected="false" data-tab="schema">Schema</button>
+      <button role="tab" id="tab-stand" aria-selected="false" data-tab="stand">Stand</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div id="exampleBanner" class="banner" hidden>
+    <p><b>Voorbeeld.</b> Dit zijn verzonnen spelers om te tonen hoe het werkt. Wis ze en vul je eigen deelnemers in bij <b>Spelers</b>.</p>
+    <button class="btn" id="clearExample">Voorbeeld wissen</button>
+  </div>
+
+  <section id="view-spelers" class="stack" hidden></section>
+  <section id="view-ronde" class="stack"></section>
+  <section id="view-schema" class="stack" hidden></section>
+  <section id="view-stand" class="stack" hidden></section>
+</main>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(function(){
+"use strict";
+/* ---------- Kijkversie voor spelers ----------
+   De eigenaar publiceert de pagina opnieuw met de stand erin (live-data).
+   Wie niet mag bewerken, ziet alleen die gedeelde stand, zonder knoppen. */
+const SCRIPT_SRC = document.currentScript ? document.currentScript.textContent : "";
+const SHELL = (() => {
+  const html = el => el ? el.outerHTML : "";
+  const style = Array.from(document.querySelectorAll("style")).find(s => s.textContent.includes("--court"));
+  return [
+    html(document.querySelector("title")),
+    html(document.querySelector('meta[name="claude:viewport-fit-sides"]')),
+    Array.from(document.querySelectorAll('link[href*="fonts.g"]')).map(html).join(""),
+    html(style), html(document.querySelector("header.top")), html(document.querySelector("main")), html(document.getElementById("toast"))
+  ].join("\n");
+})();
+let LIVE = (() => { try { const el = document.getElementById("live-data"); return el ? JSON.parse(el.textContent) : null; } catch(e){ return null; } })();
+let VIEW = !!LIVE;      // kijkversie tot blijkt dat deze kijker mag bewerken
+let artifactCap = null; // alleen voor de eigenaar
+/* GitHub Pages: spelers openen ...?kijk en lezen live.json; de eigenaar schrijft live.json met een eigen sleutel. */
+// De app leest uit het adres in welke GitHub-repository hij staat: <owner>.github.io/<repo>/
+const GH = (() => {
+  const owner = location.hostname.replace(/\.github\.io$/, "");
+  const seg = location.pathname.split("/")[1] || "";
+  return seg && !seg.includes(".") ? {owner, repo: seg, path: "live.json"} : {owner, repo: owner + ".github.io", path: "live.json"};
+})();
+const QS = new URLSearchParams(location.search);
+const KIJK = QS.has("kijk");
+const ON_GH = /\.github\.io$/.test(location.hostname) || QS.has("gh");
+const GH_TOKEN_KEY = "wp-gh-token";
+const ghToken = () => { try { return localStorage.getItem(GH_TOKEN_KEY) || ""; } catch(e){ return ""; } };
+if (KIJK) VIEW = true;
+const SKELETON_RESET = ':root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px/1.4 system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}';
+const LS_KEY = "wisselpartner-tornooi-v1";
+const LEVEL_NAMES = ["", "Beginner", "Basis", "Gemiddeld", "Goed", "Sterk"];
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid = () => Math.random().toString(36).slice(2, 9);
+
+/* ---------- State ---------- */
+function exampleState(){
+  const names = [["Annelies",4],["Bram",5],["Chaimae",2],["Dries",3],["Elif",1],["Femke",3],["Glenn",5],["Hanne",2],["Ismail",4],["Jolien",3],["Kobe",1],["Lotte",4],["Mehdi",3],["Nora",2]];
+  const fun = [["Pieter",2],["Sofie",3],["Yasmine",1],["Tom",3],["Ward",2]];
+  return baseState({example:true, players: names.map(([name,level]) => ({id:uid(), name, level, active:true, rec:false}))
+    .concat(fun.map(([name,level]) => ({id:uid(), name, level, active:true, rec:true})))});
+}
+function baseState(extra){
+  return Object.assign({
+    v:1, name:"Padeltornooi collega's", teamSize:2, courts:3, minutes:10,
+    courtNames:"", levelWeight:2, recCourts:1, recCourtName:"Recreatieveld", restCourts:0, restCourtName:"Rustveld", showLevel:false, rankBy:"avg", autoShare:true, lastShared:0,
+    startTime:"17:00", endTime:"19:00", changeMinutes:3, roundsOverride:0, plan:null, planKey:"", matrixPool:"main", matrixMode:"opp",
+    players:[], rounds:[], example:false, updatedAt:0, viewRound:null
+  }, extra||{});
+}
+let S = null;
+let tab = "ronde";
+let confirmAction = null; // inline bevestiging
+
+function loadLocal(){
+  try { const raw = localStorage.getItem(LS_KEY); if (raw) return JSON.parse(raw); } catch(e){}
+  return null;
+}
+function saveLocal(){
+  try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch(e){}
+}
+
+/* ---------- Opslag in de cloud (privé per gebruiker) ---------- */
+let dbRef = null, dbBusy = false, dbPending = false, dbTimer = null;
+function setSync(t){ $("#sync").textContent = t; }
+async function initCloud(){
+  try{
+    if (!window.claude || !window.claude.use) return;
+    const [db, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
+    if (!db || !user) return;
+    const id = await user.id();
+    if (!id) return;
+    dbRef = db.collection("data/users/" + id).doc("tornooi");
+    const snap = await Promise.race([dbRef.get(), new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")),10000))]);
+    if (snap && snap.exists){
+      const d = snap.data();
+      if (d && d.json && (d.updatedAt||0) > (S.updatedAt||0)){
+        try { S = Object.assign(baseState(), JSON.parse(d.json)); saveLocal(); render(); toast("Tornooi geladen uit je account"); } catch(e){}
+      } else if ((S.updatedAt||0) > (d.updatedAt||0)) { queueCloud(); }
+    } else if (S.updatedAt) { queueCloud(); }
+    setSync("bewaard in je account");
+  }catch(e){ dbRef = null; setSync("lokaal bewaard"); }
+}
+function queueCloud(){
+  if (!dbRef) return;
+  clearTimeout(dbTimer);
+  dbTimer = setTimeout(flushCloud, 700);
+}
+async function flushCloud(){
+  if (!dbRef) return;
+  if (dbBusy){ dbPending = true; return; }
+  dbBusy = true; setSync("bewaren…");
+  try { await dbRef.set({json: JSON.stringify(S), updatedAt: S.updatedAt}); setSync("bewaard in je account"); }
+  catch(e){ setSync("lokaal bewaard"); }
+  dbBusy = false;
+  if (dbPending){ dbPending = false; flushCloud(); }
+}
+function save(){
+  if (VIEW) return; // kijkers bewaren niets
+  S.updatedAt = Date.now();
+  saveLocal(); queueCloud();
+}
+
+/* ---------- Delen met spelers ---------- */
+const hhmm = t => { const d = new Date(t); return String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0"); };
+function shareBar(){
+  if (VIEW || !(artifactCap || ON_GH)) return "";
+  if (ON_GH && !ghToken()) return `<div class="sharebar"><span class="grow small">Spelers laten meekijken? Stel eerst je sleutel in bij <b>Spelers → Delen met spelers</b>.</span></div>`;
+  return `<div class="sharebar"><span class="grow small">${S.lastShared ? `Spelers zien de stand van <b>${hhmm(S.lastShared)}</b>.` : "Spelers kunnen nog niets zien."}${S.autoShare ? " Bij elke nieuwe ronde wordt dit automatisch bijgewerkt." : ""}</span><button class="btn" data-act="share">Bijwerken voor spelers</button></div>`;
+}
+function publicState(){
+  const c = JSON.parse(JSON.stringify(S));
+  c.players.forEach(p => p.level = 0); // niveau-inschattingen blijven privé
+  c.planKey = "";                      // bevat de niveaus: nooit meesturen
+  delete c.levelWeight;                // ook hoe zwaar niveau telt, blijft privé
+  c.showLevel = false; c.example = false; c.viewRound = null;
+  return c;
+}
+function buildDoc(state){
+  const json = JSON.stringify({publishedAt: Date.now(), state}).replace(/</g, "\\u003c");
+  return '<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>' + SKELETON_RESET + '</style></head><body>'
+    + SHELL + '\n<script type="application/json" id="live-data">' + json + '<\/script>\n<script>' + SCRIPT_SRC + '<\/script></body></html>';
+}
+let sharing = false;
+async function shareLive(){
+  if (VIEW || sharing) return;
+  if (ON_GH){ return shareGitHub(); }
+  if (!artifactCap){ toast("Delen lukt alleen in de online versie, als eigenaar"); return; }
+  sharing = true; toast("Bijwerken voor spelers…");
+  ensurePlan(false); S.lastShared = Date.now(); save();
+  try { sessionStorage.setItem("wp-tab", tab); } catch(e){}
+  clearTimeout(dbTimer); try { await flushCloud(); } catch(e){}
+  try { await artifactCap.publish(buildDoc(publicState())); }
+  catch(e){
+    const code = e && e.code;
+    toast(code === "conflict" ? "Tegelijk bijgewerkt op een ander toestel. Probeer opnieuw." : code === "not_granted" || code === "not_writer" ? "Alleen de eigenaar kan bijwerken" : "Bijwerken lukte niet. Probeer opnieuw.");
+  }
+  sharing = false;
+}
+
+/* ---------- Delen via GitHub ---------- */
+const b64 = str => { const bytes = new TextEncoder().encode(str); let bin = ""; bytes.forEach(b => bin += String.fromCharCode(b)); return btoa(bin); };
+async function ghRequest(method, body){
+  const url = `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH.path}`;
+  const res = await fetch(url, {method, headers: {Authorization: "Bearer " + ghToken(), Accept: "application/vnd.github+json"}, body: body ? JSON.stringify(body) : undefined, cache: "no-store"});
+  return res;
+}
+async function shareGitHub(){
+  if (!ghToken()){ toast("Stel eerst je sleutel in bij Spelers → Delen met spelers"); return; }
+  sharing = true; toast("Bijwerken voor spelers…");
+  ensurePlan(false);
+  const content = JSON.stringify({publishedAt: Date.now(), state: publicState()});
+  try {
+    let sha;
+    const cur = await ghRequest("GET");
+    if (cur.status === 200) sha = (await cur.json()).sha;
+    else if (cur.status === 401) throw {msg: "De sleutel klopt niet of is verlopen. Maak een nieuwe aan."};
+    else if (cur.status !== 404) throw {msg: "Geen toegang tot je website (" + cur.status + "). Kijk de rechten van je sleutel na."};
+    const put = await ghRequest("PUT", {message: "Tornooi bijgewerkt", content: b64(content), sha});
+    if (put.status === 409) throw {msg: "Tegelijk bijgewerkt. Probeer nog eens."};
+    if (put.status === 401) throw {msg: "De sleutel klopt niet of is verlopen. Maak een nieuwe aan."};
+    if (put.status === 403 || put.status === 404) throw {msg: "Je sleutel mag niet schrijven. Geef hem 'Contents: Read and write'."};
+    if (!put.ok) throw {msg: "Bijwerken lukte niet (" + put.status + "). Probeer opnieuw."};
+    S.lastShared = Date.now(); save(); render();
+    toast("Bijgewerkt. Spelers zien het binnen ongeveer een minuut.");
+  } catch(e){ toast((e && e.msg) || "Geen internet? Bijwerken lukte niet."); }
+  sharing = false;
+}
+const viewerLink = () => location.origin + location.pathname + "?kijk";
+function ghPanel(){
+  if (!ON_GH) return "";
+  const has = !!ghToken();
+  return `<details class="panel" ${has ? "" : "open"}>
+    <summary>Delen met spelers</summary>
+    <div class="stack">
+      <p class="small" style="margin:0">Stuur deze link naar je spelers. Ze zien Ronde, Schema en Stand, zonder knoppen en zonder niveaus:</p>
+      <div class="row"><input type="text" id="viewerLink" readonly value="${esc(viewerLink())}" class="grow" style="flex:1;min-width:0"><button class="btn" data-act="copy-link">Kopieer</button></div>
+      <p class="small muted" style="margin:0">${has ? "Je sleutel is ingesteld op dit toestel. Met <b>Bijwerken voor spelers</b> (tabblad Ronde) zet je de stand online." : "Om de stand online te zetten, heeft de app eenmalig een sleutel (token) van GitHub nodig. Die blijft alleen op dit toestel."}</p>
+      <div class="row"><input type="password" id="ghTokenInput" placeholder="${has ? "sleutel ingesteld ✓" : "plak hier je sleutel (github_pat_…)"}" autocomplete="off" class="grow" style="flex:1;min-width:0">
+        <button class="btn primary" data-act="save-token">Bewaar</button>${has ? `<button class="btn ghost" data-act="forget-token">Wis sleutel</button>` : ""}</div>
+    </div>
+  </details>`;
+}
+let livePoll = null;
+async function pollLive(){
+  try {
+    const res = await fetch("live.json?t=" + Date.now(), {cache: "no-store"});
+    if (res.ok){
+      const data = await res.json();
+      if (!LIVE || data.publishedAt !== LIVE.publishedAt){
+        const keepRound = S && S.viewRound;
+        LIVE = data; S = Object.assign(baseState(), data.state); S.viewRound = keepRound ?? null; render();
+      }
+    } else if (!LIVE){ render(); }
+  } catch(e){}
+  clearTimeout(livePoll); livePoll = setTimeout(pollLive, 30000);
+}
+
+/* ---------- Helpers ---------- */
+const P = id => S.players.find(p => p.id === id);
+const pname = id => (P(id) || {name:"?"}).name;
+const plevel = id => (P(id) || {level:3}).level;
+function courtName(i){
+  const custom = (S.courtNames||"").split(",").map(s=>s.trim()).filter(Boolean);
+  return custom[i] || ("Veld " + (i+1));
+}
+function isScored(m){ return m.sa !== null && m.sa !== undefined && m.sb !== null && m.sb !== undefined; }
+
+/* ---------- Statistieken ---------- */
+// pool: "main" = tornooi, "rec" = recreatie (aparte stand)
+const poolMatches = (r, pool) => pool === "rec" ? (r.rec ? r.rec.matches : []) : r.matches;
+function computeStats(pool){
+  const st = {};
+  S.players.forEach(p => st[p.id] = {id:p.id, played:0, w:0, d:0, l:0, pf:0, pa:0, rests:0, partners:{}});
+  S.rounds.forEach(r => {
+    poolMatches(r, pool).forEach(m => {
+      if (!isScored(m)) return;
+      const sides = [[m.a, m.sa, m.sb],[m.b, m.sb, m.sa]];
+      sides.forEach(([ids, f, a]) => ids.forEach(id => {
+        const s = st[id]; if (!s) return;
+        s.played++; s.pf += f; s.pa += a;
+        if (f > a) s.w++; else if (f < a) s.l++; else s.d++;
+        ids.forEach(o => { if (o !== id) s.partners[o] = (s.partners[o]||0) + 1; });
+      }));
+    });
+  });
+  return st;
+}
+function ranking(pool){
+  const st = computeStats(pool);
+  const rows = Object.values(st).map(s => Object.assign(s, {
+    avg: s.played ? s.pf / s.played : 0,
+    diff: s.pf - s.pa,
+    mp: s.w*3 + s.d
+  }));
+  const key = S.rankBy;
+  rows.sort((x,y) => {
+    const a = key==="total" ? y.pf - x.pf : key==="wins" ? y.mp - x.mp : y.avg - x.avg;
+    if (a) return a;
+    if (y.diff !== x.diff) return y.diff - x.diff;
+    return y.pf - x.pf;
+  });
+  return rows;
+}
+
+/* ---------- Indeling: wie speelt met en tegen wie ---------- */
+function historyCounts(){
+  const partner = {}, opp = {}, played = {}, lastRest = {};
+  const k = (a,b) => a < b ? a+"|"+b : b+"|"+a;
+  S.rounds.forEach((r, ri) => {
+    (r.rest||[]).concat(r.rec ? r.rec.rest : []).forEach(id => lastRest[id] = ri);
+    r.matches.concat(r.rec ? r.rec.matches : []).forEach(m => {
+      [m.a, m.b].forEach(t => { t.forEach(id => played[id] = (played[id]||0)+1);
+        for (let i=0;i<t.length;i++) for (let j=i+1;j<t.length;j++) partner[k(t[i],t[j])] = (partner[k(t[i],t[j])]||0)+1; });
+      m.a.forEach(x => m.b.forEach(y => opp[k(x,y)] = (opp[k(x,y)]||0)+1));
+    });
+  });
+  return {
+    partner: (a,b) => partner[k(a,b)]||0,
+    opp: (a,b) => opp[k(a,b)]||0,
+    played: id => played[id]||0,
+    lastRest: id => lastRest[id] === undefined ? -99 : lastRest[id]
+  };
+}
+function shuffle(a){ for (let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+function bestSplit(group, H, w){
+  // group = spelers in één wedstrijd; geeft {a,b,cost}
+  const lv = id => plevel(id);
+  const evalTeams = (a,b) => {
+    let c = 0;
+    for (let i=0;i<a.length;i++) for (let j=i+1;j<a.length;j++) c += 300 * H.partner(a[i],a[j]) ** 1.5;
+    for (let i=0;i<b.length;i++) for (let j=i+1;j<b.length;j++) c += 300 * H.partner(b[i],b[j]) ** 1.5;
+    a.forEach(x => b.forEach(y => c += 30 * H.opp(x,y)));
+    const sa = a.reduce((s,id)=>s+lv(id),0), sb = b.reduce((s,id)=>s+lv(id),0);
+    c += w * 18 * (sa-sb)**2;
+    const all = a.concat(b).map(lv);
+    c += w * 2 * (Math.max(...all) - Math.min(...all))**2;
+    return c;
+  };
+  if (group.length === 2) return {a:[group[0]], b:[group[1]], cost: evalTeams([group[0]],[group[1]])};
+  const [p,q,r,s] = group;
+  const opts = [[[p,q],[r,s]],[[p,r],[q,s]],[[p,s],[q,r]]];
+  let best = null;
+  opts.forEach(([a,b]) => { const c = evalTeams(a,b); if (!best || c < best.cost) best = {a,b,cost:c}; });
+  return best;
+}
+
+function generateRound(){
+  const H = historyCounts();
+  const roundIdx = S.rounds.length;
+  // wie later aansluit ("vanaf ronde x") rust tot dan
+  const here = p => p.active && !((p.from||1) > roundIdx+1);
+  const late = p => p.active && (p.from||1) > roundIdx+1;
+  const tour = S.players.filter(p => here(p) && !p.rec).map(p => p.id);
+  const fun = S.players.filter(p => here(p) && p.rec).map(p => p.id);
+  const main = planPool(tour, S.courts, H, roundIdx, S.levelWeight);
+  const rec = planPool(fun, S.recCourts, H, roundIdx, Math.min(S.levelWeight, 1));
+  if (!main.matches.length && !rec.matches.length) return null;
+  const extra = planExtra(main.rest.concat(rec.rest), H); // wie nog niet aanwezig is, speelt ook niet op het rustveld
+  main.rest = main.rest.concat(S.players.filter(p => late(p) && !p.rec).map(p => p.id));
+  rec.rest = rec.rest.concat(S.players.filter(p => late(p) && p.rec).map(p => p.id));
+  return {n: roundIdx+1, matches: main.matches, rest: main.rest, rec, extra};
+}
+
+// Rustveld: wie rust (tornooi + recreatie) speelt vrij, zonder score. Telt niet mee als gespeeld.
+function planExtra(pool, H){
+  const per = S.teamSize*2, matches = [];
+  const ids = shuffle(pool.slice());
+  for (let c = 0; c < (S.restCourts||0) && ids.length >= 2; c++){
+    const g = ids.splice(0, per);
+    if (g.length === per){ const sp = bestSplit(g, H, 0); matches.push({a: sp.a, b: sp.b}); }
+    else { const half = Math.ceil(g.length/2); matches.push({a: g.slice(0, half), b: g.slice(half)}); }
+  }
+  return {matches};
+}
+
+function planPool(active, maxCourts, H, roundIdx, w){
+  const ts = S.teamSize, per = ts*2;
+  const nCourts = Math.min(maxCourts, Math.floor(active.length / per));
+  if (nCourts < 1) return {matches: [], rest: active.slice()};
+  const need = nCourts * per;
+  // Wie rust:
+  // 1. nooit wie vorige ronde al rustte (niet te lang stilzitten), zolang dat kan;
+  // 2. dan wie al het meest speelde (zo speelt iedereen evenveel);
+  // 3. bij gelijk aantal: wie het langst geleden rustte. Daarna toeval.
+  const justRested = id => H.lastRest(id) === roundIdx-1 ? 1 : 0;
+  const order = shuffle(active.slice()).sort((x,y) => {
+    const j = justRested(x) - justRested(y); if (j) return j;
+    const d = H.played(y) - H.played(x); if (d) return d;
+    return H.lastRest(x) - H.lastRest(y);
+  });
+  const restN = active.length - need;
+  const rest = restN > 0 ? order.slice(0, restN) : [];
+  const playing = active.filter(id => !rest.includes(id));
+
+  // Zoek de beste verdeling: willekeurige start + verbeteren door te wisselen
+  const groupCost = g => bestSplit(g, H, w).cost;
+  let best = null;
+  const restarts = playing.length > 24 ? 25 : 60;
+  for (let t=0; t<restarts; t++){
+    const arr = shuffle(playing.slice());
+    const groups = []; for (let i=0;i<nCourts;i++) groups.push(arr.slice(i*per, i*per+per));
+    let costs = groups.map(groupCost);
+    let improved = true, guard = 0;
+    while (improved && guard++ < 40){
+      improved = false;
+      for (let g1=0; g1<groups.length; g1++) for (let g2=g1+1; g2<groups.length; g2++)
+        for (let i=0;i<per;i++) for (let j=0;j<per;j++){
+          const A = groups[g1].slice(), B = groups[g2].slice();
+          [A[i], B[j]] = [B[j], A[i]];
+          const ca = groupCost(A), cb = groupCost(B);
+          if (ca + cb < costs[g1] + costs[g2] - 1e-9){ groups[g1]=A; groups[g2]=B; costs[g1]=ca; costs[g2]=cb; improved = true; }
+        }
+    }
+    const total = costs.reduce((a,b)=>a+b,0);
+    if (!best || total < best.total) best = {total, groups: groups.map(g=>g.slice())};
+  }
+  const courtsOrder = shuffle([...Array(nCourts).keys()]);
+  const matches = best.groups.map((g, i) => {
+    const sp = bestSplit(g, H, w);
+    return {court: courtsOrder[i], a: sp.a, b: sp.b, sa: null, sb: null};
+  }).sort((x,y) => x.court - y.court);
+  return {matches, rest};
+}
+
+/* ---------- Schema: alle rondes op voorhand plannen ---------- */
+const toMin = t => { const m = /^(\d{1,2}):(\d{2})$/.exec(t||""); return m ? (+m[1])*60 + (+m[2]) : null; };
+const toClock = m => String(Math.floor(m/60)%24).padStart(2,"0") + ":" + String(m%60).padStart(2,"0");
+function totalRounds(){
+  if (S.roundsOverride > 0) return S.roundsOverride;
+  const a = toMin(S.startTime), b = toMin(S.endTime), slot = S.minutes + S.changeMinutes;
+  if (a === null || b === null || b <= a || slot <= 0) return Math.max(S.rounds.length, 1);
+  return Math.max(1, Math.floor((b - a) / slot));
+}
+function roundStart(i){ const a = toMin(S.startTime); return a === null ? null : toClock(a + i*(S.minutes + S.changeMinutes)); }
+function planKey(){
+  // Het schema blijft geldig zolang aanwezigen, niveaus, instellingen en gespeelde indelingen gelijk blijven
+  return JSON.stringify([
+    S.players.map(p => [p.id, p.active, p.rec, p.level, p.from||1]),
+    S.teamSize, S.courts, S.recCourts, S.restCourts, S.levelWeight, totalRounds(),
+    S.rounds.map(r => r.matches.map(m => m.a.concat(m.b)).concat(r.rec ? r.rec.matches.map(m => m.a.concat(m.b)) : []))
+  ]);
+}
+function ensurePlan(force){
+  const key = planKey();
+  if (!force && S.plan && S.planKey === key) return;
+  const saved = S.rounds, plan = [];
+  S.rounds = saved.slice();
+  try {
+    for (let i = saved.length; i < totalRounds(); i++){
+      const r = generateRound(); if (!r) break;
+      S.rounds.push(r); plan.push(r);
+    }
+  } finally { S.rounds = saved; }
+  S.plan = plan; S.planKey = key;
+}
+function nextRound(){
+  ensurePlan(false);
+  if (S.plan && S.plan.length) return JSON.parse(JSON.stringify(S.plan.shift()));
+  return generateRound(); // voorbij het geplande aantal rondes: gewoon verder indelen
+}
+function afterRoundChange(){ S.planKey = planKey(); } // rest van het schema blijft geldig
+
+/* ---------- Timer ---------- */
+let T = {running:false, endsAt:0, remaining:null, done:false};
+const TKEY = LS_KEY + "-timer";
+function saveT(){ try { localStorage.setItem(TKEY, JSON.stringify(T)); } catch(e){} }
+let tick = null, audioCtx = null;
+function timerRemaining(){ return T.running ? Math.max(0, T.endsAt - Date.now()) : (T.remaining ?? S.minutes*60000); }
+function fmt(ms){ const s = Math.ceil(ms/1000); return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0"); }
+function beep(){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    [0, .45, .9].forEach(off => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.frequency.value = 880; o.type = "square"; g.gain.value = .12;
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(audioCtx.currentTime+off); o.stop(audioCtx.currentTime+off+.3);
+    });
+  }catch(e){}
+}
+function timerStart(){
+  try{ audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)(); audioCtx.resume && audioCtx.resume(); }catch(e){}
+  const rem = timerRemaining() || S.minutes*60000;
+  T = {running:true, endsAt: Date.now()+rem, remaining:null, done:false};
+  try { navigator.wakeLock && navigator.wakeLock.request("screen").catch(()=>{}); } catch(e){}
+  clearInterval(tick); tick = setInterval(updateClock, 250); updateClock(); renderTimerButtons(); saveT();
+}
+function timerPause(){ T.remaining = timerRemaining(); T.running = false; clearInterval(tick); updateClock(); renderTimerButtons(); saveT(); }
+function timerReset(){ T = {running:false, endsAt:0, remaining:null, done:false}; clearInterval(tick); updateClock(); renderTimerButtons(); saveT(); }
+function updateClock(){
+  const el = $("#clock"); if (!el) return;
+  const rem = timerRemaining();
+  el.textContent = fmt(rem);
+  if (T.running && rem <= 0){ T.running = false; T.remaining = 0; T.done = true; clearInterval(tick); beep(); renderTimerButtons(); saveT(); }
+  const box = $("#timerBox"); if (box) box.classList.toggle("done", T.done);
+}
+function renderTimerButtons(){
+  const b = $("#timerToggle"); if (!b) return;
+  b.textContent = T.running ? "Pauze" : (T.done ? "Opnieuw" : (T.remaining ? "Verder" : "Start"));
+  if (T.done) b.dataset.act = "timer-restart"; else b.dataset.act = T.running ? "timer-pause" : "timer-start";
+  const box = $("#timerBox"); if (box) box.classList.toggle("done", T.done);
+}
+
+/* ---------- Render ---------- */
+function render(){
+  document.title = S.name ? S.name : "Wisselpartner Tornooi";
+  $("#title").textContent = S.name || "Wisselpartner Tornooi";
+  $("#exampleBanner").hidden = !S.example || VIEW;
+  document.body.classList.toggle("viewer", VIEW);
+  if (VIEW && tab === "spelers") tab = "ronde";
+  if (VIEW && LIVE) setSync("kijkversie · bijgewerkt " + hhmm(LIVE.publishedAt));
+  document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === tab));
+  ["spelers","ronde","schema","stand"].forEach(t => $("#view-"+t).hidden = t !== tab);
+  if (tab === "schema") renderSchema();
+  if (tab === "spelers") renderPlayers();
+  if (tab === "ronde") renderRound();
+  if (tab === "stand") renderStand();
+}
+
+function confirmHtml(key, text, yes){
+  if (confirmAction !== key) return "";
+  return `<div class="confirm"><span class="grow">${text}</span><button class="btn" data-act="confirm-no">Annuleren</button><button class="btn primary" data-act="confirm-yes" data-key="${key}">${yes}</button></div>`;
+}
+
+function renderPlayers(){
+  const active = S.players.filter(p=>p.active && !p.rec).length;
+  const funN = S.players.filter(p=>p.active && p.rec).length;
+  const per = S.teamSize*2;
+  const used = Math.min(S.courts, Math.floor(active/per));
+  const restN = active - used*per;
+  const funUsed = Math.min(S.recCourts, Math.floor(funN/per));
+  const funRest = funN - funUsed*per;
+  const levelBtns = p => [1,2,3,4,5].map(l => `<button class="${l<=p.level?'on':''}" data-act="level" data-id="${p.id}" data-level="${l}" aria-label="Niveau ${l} ${LEVEL_NAMES[l]}" title="${LEVEL_NAMES[l]}">${l}</button>`).join("");
+  $("#view-spelers").innerHTML = `
+    <div class="stack" style="gap:4px"><h2>Spelers</h2>
+      <span class="muted small">Tornooi: ${active} aanwezig · ${used} ${used===1?'veld':'velden'}${restN>0?` · ${restN} rust${restN===1?'':'en'} per ronde`:''}${funN?`<br>Recreatie: ${funN} aanwezig${funUsed?` · ${funUsed} ${funUsed===1?'veld':'velden'}`:''}${funUsed&&funRest>0?` · ${funRest} rust${funRest===1?'':'en'} per ronde`:''}${funN&&!funUsed?` · <span style="color:var(--warn)">te weinig om te spelen (${per} nodig)</span>`:''}`:''}</span></div>
+    <p class="muted small" style="margin:0">Tik op <b>Tornooi</b> of <b>Fun</b> bij een speler om te kiezen waar die speelt. Fun-spelers wisselen onderling op het recreatieveld en tellen niet mee in de stand. Komt iemand later? Kies <b>vanaf ronde …</b>: die speler rust tot dan en staat wel al in het schema.</p>
+    <div class="legend"><span><b>Niveau:</b></span>${[1,2,3,4,5].map(l=>`<span><b>${l}</b> ${LEVEL_NAMES[l]}</span>`).join("")}</div>
+    <div class="plist">${S.players.map(p => `
+      <div class="prow ${p.active?'':'off'}">
+        <button class="present" data-act="toggle-active" data-id="${p.id}" aria-pressed="${p.active}" title="${p.active?'Aanwezig (tik om te laten rusten)':'Afwezig (tik om mee te doen)'}" aria-label="${esc(p.name)} ${p.active?'aanwezig':'afwezig'}">${p.active?'✓':''}</button>
+        <input type="text" id="pn-${p.id}" value="${esc(p.name)}" data-act="rename" data-id="${p.id}" aria-label="Naam">
+        <div class="pmeta">
+          <button class="mode ${p.rec?'fun':''}" data-act="toggle-rec" data-id="${p.id}" title="Tik om te wisselen tussen tornooi en recreatie">${p.rec?'Fun':'Tornooi'}</button>
+          <select class="from ${(p.from||1)>1?'late':''}" id="from-${p.id}" data-act="from" data-id="${p.id}" aria-label="Speelt vanaf ronde" title="Speelt vanaf ronde">${[1,2,3,4,5,6,7,8].map(n=>`<option value="${n}" ${(p.from||1)===n?'selected':''}>${n===1?'vanaf start':'vanaf r'+n}</option>`).join("")}</select>
+        </div>
+        <div class="levels" role="group" aria-label="Niveau">${levelBtns(p)}</div>
+        <button class="iconbtn" data-act="del-player" data-id="${p.id}" aria-label="Verwijder ${esc(p.name)}" title="Verwijderen">×</button>
+      </div>`).join("") || `<p class="muted">Nog geen spelers. Voeg ze hieronder toe.</p>`}
+    </div>
+    ${confirmHtml("del-player", "Deze speler heeft al gespeeld. Verwijderen haalt ook die scores uit de stand. Liever op afwezig zetten?", "Toch verwijderen")}
+    <div class="panel stack">
+      <h3>Spelers toevoegen</h3>
+      <form id="addForm" class="row">
+        <input type="text" id="addName" class="grow" placeholder="Naam" autocomplete="off" style="flex:1;min-width:160px">
+        <select id="addLevel" style="width:auto" aria-label="Niveau">${[1,2,3,4,5].map(l=>`<option value="${l}" ${l===3?'selected':''}>${l} · ${LEVEL_NAMES[l]}</option>`).join("")}</select>
+        <select id="addRec" style="width:auto" aria-label="Speelt in"><option value="0">Tornooi</option><option value="1">Fun</option></select>
+        <button class="btn primary" type="submit">Toevoegen</button>
+      </form>
+      <details><summary class="small muted" style="cursor:pointer">Meerdere namen tegelijk (bv. een klaslijst plakken)</summary>
+        <div class="stack" style="margin-top:10px">
+          <textarea id="bulk" placeholder="Eén naam per lijn. Niveau mag erachter, bv.&#10;Sara 4&#10;Youssef 2&#10;Milan"></textarea>
+          <label class="row small"><input type="checkbox" id="bulkRec" style="width:22px;height:22px"> Als recreatiespelers (Fun) toevoegen</label>
+          <div><button class="btn" data-act="bulk-add">Lijst toevoegen</button></div>
+        </div>
+      </details>
+    </div>
+    <div class="panel stack">
+      <h3>Instellingen</h3>
+      <div class="settings">
+        <label class="field">Naam tornooi<input type="text" id="setName" value="${esc(S.name)}"></label>
+        <label class="field">Spelvorm
+          <select id="setTeam"><option value="2" ${S.teamSize===2?'selected':''}>Dubbel (2 tegen 2)</option><option value="1" ${S.teamSize===1?'selected':''}>Enkel (1 tegen 1)</option></select></label>
+        <label class="field">Aantal velden<input type="number" id="setCourts" min="1" max="12" value="${S.courts}"></label>
+        <label class="field">Speeltijd per match (min)<input type="number" id="setMinutes" min="1" max="60" value="${S.minutes}"></label>
+        <label class="field">Belang van niveau
+          <select id="setWeight">${[["0","Niet (puur wisselen)"],["1","Een beetje"],["2","Normaal"],["4","Sterk"]].map(([v,t])=>`<option value="${v}" ${String(S.levelWeight)===v?'selected':''}>${t}</option>`).join("")}</select></label>
+        <label class="field">Namen velden (optioneel)<input type="text" id="setCourtNames" value="${esc(S.courtNames)}" placeholder="bv. Veld A, Veld B, Veld C"></label>
+        <label class="field">Recreatievelden<input type="number" id="setRecCourts" min="0" max="4" value="${S.recCourts}"></label>
+        <label class="field">Naam recreatieveld<input type="text" id="setRecName" value="${esc(S.recCourtName)}"></label>
+        <label class="field">Rustveld (wie rust speelt vrij)
+          <select id="setRestCourts"><option value="0" ${!S.restCourts?'selected':''}>Geen</option><option value="1" ${S.restCourts===1?'selected':''}>1 veld</option><option value="2" ${S.restCourts===2?'selected':''}>2 velden</option></select></label>
+      </div>
+      <label class="row small"><input type="checkbox" id="setShowLevel" ${S.showLevel?'checked':''} style="width:22px;height:22px"> Niveau tonen bij de wedstrijden (uit = niemand ziet zijn inschatting)</label>
+      <label class="row small" ${artifactCap || ON_GH ? "" : "hidden"}><input type="checkbox" id="setAutoShare" ${S.autoShare?'checked':''} style="width:22px;height:22px"> Bij elke nieuwe ronde automatisch bijwerken voor spelers die meekijken</label>
+    </div>
+    ${ghPanel()}
+    <details class="panel">
+      <summary>Bewaren, overzetten en opnieuw beginnen</summary>
+      <div class="stack">
+        <p class="small muted" style="margin:0">Alles wordt automatisch bewaard op dit toestel${dbRef?' en in je account':''}. Om het tornooi naar een ander toestel over te zetten: kopieer de code en plak ze daar.</p>
+        <div class="row"><button class="btn" data-act="export">Kopieer back-upcode</button></div>
+        <textarea id="importBox" placeholder="Plak hier een back-upcode"></textarea>
+        <div class="row"><button class="btn" data-act="import">Back-up terugzetten</button></div>
+        ${confirmHtml("import", "Het huidige tornooi wordt vervangen door de back-up.", "Vervangen")}
+        <hr style="border:0;border-top:1px solid var(--line);width:100%">
+        <div class="row">
+          <button class="btn ghost" data-act="ask-reset-rounds">Scores wissen, spelers houden</button>
+          <button class="btn danger" data-act="ask-reset-all">Alles wissen</button>
+        </div>
+        ${confirmHtml("reset-rounds", "Alle rondes en scores worden gewist. De spelerslijst blijft.", "Wissen")}
+        ${confirmHtml("reset-all", "Spelers, rondes en scores worden gewist.", "Alles wissen")}
+      </div>
+    </details>`;
+}
+
+function currentRoundIndex(){
+  if (!S.rounds.length) return -1;
+  if (S.viewRound === null || S.viewRound === undefined || S.viewRound >= S.rounds.length) return S.rounds.length-1;
+  return S.viewRound;
+}
+
+function renderRound(){
+  const el = $("#view-ronde");
+  const active = S.players.filter(p=>p.active && !p.rec).length;
+  const funN = S.players.filter(p=>p.active && p.rec).length;
+  const per = S.teamSize*2;
+  const canStart = active >= per || (S.recCourts > 0 && funN >= per);
+  if (VIEW && !LIVE){
+    el.innerHTML = `<div class="panel empty-state"><h2>Nog niets gedeeld</h2>
+      <p class="muted">De organisator heeft het schema nog niet online gezet. Deze pagina ververst vanzelf.</p></div>`;
+    return;
+  }
+  if (VIEW && !S.rounds.length){
+    el.innerHTML = `<div class="panel empty-state"><h2>Het tornooi is nog niet begonnen</h2>
+      <p class="muted">We starten om ${esc(S.startTime)}. Bij Schema zie je al wanneer en met wie je speelt.</p></div>`;
+    return;
+  }
+  if (!S.rounds.length){
+    el.innerHTML = `${shareBar()}<div class="panel empty-state">
+      <h2>Klaar om te starten?</h2>
+      <p class="muted">${active} tornooispelers op ${S.courts} ${S.courts===1?'veld':'velden'}${funN?` en ${funN} fun-spelers op het recreatieveld`:''}. Elke ronde krijgt iedereen een nieuwe partner, en de teams worden zo eerlijk mogelijk verdeeld op niveau.</p>
+      ${!canStart ? `<p style="color:var(--warn)"><b>Te weinig spelers:</b> je hebt er minstens ${per} nodig.</p>` : ""}
+      <button class="btn ball big" data-act="new-round" ${canStart?'':'disabled'}>Start ronde 1</button>
+    </div>`;
+    return;
+  }
+  const ri = currentRoundIndex();
+  const r = S.rounds[ri];
+  const isLast = ri === S.rounds.length-1;
+  const allScored = r.matches.every(isScored);
+  const anyScored = r.matches.some(isScored) || (r.rec ? r.rec.matches.some(isScored) : false);
+  const openCount = r.matches.filter(m=>!isScored(m)).length;
+  const lvlTxt = id => S.showLevel ? `<span class="lv">niveau ${plevel(id)}</span>` : "";
+  const side = (m, k, ids, val, other, pool) => {
+    const win = isScored(m) && val > other;
+    const idx = poolMatches(r, pool||"main").indexOf(m);
+    const attrs = `data-act="score" data-pool="${pool||'main'}" data-r="${ri}" data-m="${idx}" data-k="${k}"`;
+    return `<div class="side ${win?'winner':''}">
+      <div class="names">${ids.map(id=>`<span class="n">${esc(pname(id))}</span>${lvlTxt(id)}`).join("")}</div>
+      <div class="stepper">
+        <button ${attrs} data-d="-1" aria-label="Min">−</button>
+        <span class="val ${val===null||val===undefined?'empty':''}">${val===null||val===undefined?'–':val}</span>
+        <button ${attrs} data-d="1" aria-label="Plus">+</button>
+      </div></div>`;
+  };
+  el.innerHTML = `${shareBar()}
+    <div class="roundhead">
+      <div class="roundnav">
+        <button class="iconbtn" data-act="prev-round" ${ri===0?'disabled':''} aria-label="Vorige ronde">‹</button>
+        <h2>Ronde ${r.n}<span class="muted" style="font-weight:600;font-size:1rem"> / ${S.rounds.length}</span></h2>
+        <button class="iconbtn" data-act="next-view" ${isLast?'disabled':''} aria-label="Volgende ronde">›</button>
+      </div>
+      ${isLast ? `<div class="timer" id="timerBox">
+        <span class="clock" id="clock">${fmt(timerRemaining())}</span>
+        <button class="btn ball" id="timerToggle" data-act="timer-start">Start</button>
+        <button class="btn ghost" data-act="timer-reset">Reset</button>
+      </div>` : `<button class="btn" data-act="goto-last">Naar huidige ronde</button>`}
+    </div>
+    <div class="courts">${r.matches.map(m => `
+      <article class="court ${isScored(m)?'scored':''}">
+        <div class="court-head"><span>${esc(courtName(m.court))}</span><span class="state">${isScored(m)?'score genoteerd':'bezig'}</span></div>
+        ${side(m,"sa",m.a,m.sa,m.sb)}
+        <div class="vs"><span>tegen</span></div>
+        ${side(m,"sb",m.b,m.sb,m.sa)}
+        <div class="court-foot">${isScored(m)?`<button class="linkbtn" data-act="clear-score" data-r="${ri}" data-m="${r.matches.indexOf(m)}">score wissen</button>`:''}</div>
+      </article>`).join("")}
+    </div>
+    ${(() => {
+      const onExtra = new Set((r.extra ? r.extra.matches : []).flatMap(m => m.a.concat(m.b)));
+      const chips = (ids, label) => { const left = ids.filter(id => !onExtra.has(id)); return left.length ? `<div class="rest"><h3>${label}</h3>${left.map(id=>`<span class="chip">${esc(pname(id))}</span>`).join("")}</div>` : ""; };
+      const funCard = (m, title, note, cls) => `
+      <article class="court ${cls}">
+        <div class="court-head"><span>${esc(title)}</span><span class="state">${cls==='extra'?'wie rust':'voor de fun'}</span></div>
+        <div class="side"><div class="names">${m.a.map(id=>`<span class="n">${esc(pname(id))}</span>`).join("")}</div></div>
+        <div class="vs"><span>tegen</span></div>
+        <div class="side"><div class="names">${m.b.map(id=>`<span class="n">${esc(pname(id))}</span>`).join("")}</div></div>
+        <p class="fun-note">${note}</p>
+      </article>`;
+      let h = chips(r.rest || [], "Rust");
+      if (r.rec && (r.rec.matches.length || r.rec.rest.length)){
+        h += `<div class="courts">${r.rec.matches.map((m,i) => `
+      <article class="court rec">
+        <div class="court-head"><span>${esc((S.recCourtName||"Recreatieveld") + (r.rec.matches.length>1?' '+(i+1):''))}</span><span class="state">${isScored(m)?'score genoteerd':'voor de fun'}</span></div>
+        ${side(m,"sa",m.a,m.sa,m.sb,"rec")}
+        <div class="vs"><span>tegen</span></div>
+        ${side(m,"sb",m.b,m.sb,m.sa,"rec")}
+        <p class="fun-note">Score invullen mag, hoeft niet. Telt apart in de recreatiestand.${isScored(m)?` <button class="linkbtn" data-act="clear-score" data-pool="rec" data-r="${ri}" data-m="${i}">score wissen</button>`:''}</p>
+      </article>`).join("")}</div>`;
+        h += chips(r.rec.rest, "Rust (recreatie)");
+      }
+      if (r.extra && r.extra.matches.length){
+        h += `<div class="courts">${r.extra.matches.map((m,i) => funCard(m, (S.restCourtName||"Rustveld") + (r.extra.matches.length>1?' '+(i+1):''), (m.a.length!==m.b.length ? m.a.length+" tegen "+m.b.length+" · " : "") + "Wie rust, blijft in beweging. Geen score, telt niet mee.", "extra")).join("")}</div>`;
+      }
+      return h;
+    })()}
+    ${isLast ? playedNote() : ""}
+    ${isLast ? `<div class="row">
+      <button class="btn ball big grow" data-act="new-round" ${allScored?'':'disabled'}>Volgende ronde</button>
+      ${!anyScored ? `<button class="btn ghost" data-act="reshuffle">Opnieuw indelen</button>` : ""}
+    </div>
+    ${!allScored ? `<p class="muted small" style="margin:0">Noteer eerst de score van ${openCount===1?'de laatste wedstrijd':`alle ${openCount} wedstrijden`}. Wie rust, schuift volgende ronde gegarandeerd in.</p>`:''}
+    ${anyScored ? '' : `<p class="muted small" style="margin:0">Iemand afwezig of te laat? Pas het aan bij Spelers en tik op Opnieuw indelen.</p>`}` : ""}
+    ${isLast && S.rounds.length>0 ? `<div class="row"><button class="linkbtn" data-act="ask-del-round">Deze ronde verwijderen</button></div>${confirmHtml("del-round","Ronde "+r.n+" en de scores ervan verwijderen?","Verwijderen")}` : ""}
+  `;
+  if (isLast){ updateClock(); renderTimerButtons(); }
+}
+
+function playedNote(){
+  // Aantal gespeelde wedstrijden (deze ronde meegeteld) van de aanwezige tornooispelers
+  const H = historyCounts();
+  const ids = S.players.filter(p => p.active && !p.rec).map(p => p.id);
+  if (!ids.length) return "";
+  const counts = ids.map(H.played);
+  const max = Math.max(...counts), min = Math.min(...counts);
+  if (max === min) return `<p class="small" style="margin:0;color:var(--win);font-weight:700">✓ Na deze ronde heeft iedereen evenveel gespeeld: ${max} ${max===1?'wedstrijd':'wedstrijden'}.</p>`;
+  const behind = ids.filter(id => H.played(id) < max).map(pname);
+  const w = n => n + (n===1 ? ' wedstrijd' : ' wedstrijden');
+  const who = behind.length <= 5 ? esc(behind.join(", ")) : behind.length + ' spelers';
+  return `<p class="small muted" style="margin:0">Na deze ronde: ${who} ${min === max-1 ? 'nog maar '+w(min) : 'minder'}, de rest ${w(max)}. Wie het minst speelde, komt eerst aan de beurt.</p>`;
+}
+
+function renderSchema(){
+  if (!VIEW){ const before = S.planKey; ensurePlan(false); if (S.planKey !== before) save(); }
+  const played = S.rounds, plan = S.plan || [];
+  const all = played.map((r,i) => ({r, st: (i === played.length-1 && !r.matches.every(isScored)) ? "bezig" : "gespeeld"}))
+    .concat(plan.map(r => ({r, st: "gepland"})));
+  const total = totalRounds();
+  const names = ids => ids.map(id => esc(pname(id))).join(" &amp; ");
+  const tourIds = S.players.filter(p => p.active && !p.rec).map(p => p.id);
+
+  // lopende telling: na welke ronde heeft iedereen evenveel gespeeld?
+  const run = {}; tourIds.forEach(id => run[id] = 0);
+  const equalAfter = all.map(({r}) => {
+    r.matches.forEach(m => m.a.concat(m.b).forEach(id => { if (id in run) run[id]++; }));
+    const v = Object.values(run); return v.length && Math.min(...v) === Math.max(...v) ? v[0] : null;
+  });
+
+  // tellingen per speler over gespeelde + geplande rondes
+  const stats = {};
+  S.players.forEach(p => stats[p.id] = {games:0, rests:0, partners:{}, opps:{}});
+  all.forEach(({r}) => {
+    const onExtra = new Set((r.extra ? r.extra.matches : []).flatMap(m => m.a.concat(m.b)));
+    const ms = r.matches.concat(r.rec ? r.rec.matches : []);
+    ms.forEach(m => {
+      [[m.a,m.b],[m.b,m.a]].forEach(([own, other]) => own.forEach(id => { const s = stats[id]; if (!s) return;
+        s.games++; own.forEach(o => { if (o!==id) s.partners[o] = (s.partners[o]||0)+1; }); other.forEach(o => s.opps[o] = (s.opps[o]||0)+1); }));
+    });
+    (r.rest||[]).concat(r.rec ? r.rec.rest : []).forEach(id => { if (stats[id]) stats[id].rests++; });
+  });
+
+  const roundCard = ({r, st}, i) => {
+    const onExtra = new Set((r.extra ? r.extra.matches : []).flatMap(m => m.a.concat(m.b)));
+    // één scorebordje per wedstrijd: namen onder elkaar, score rechts
+    const board = (m, label, kind, withScore) => {
+      const done = withScore && isScored(m);
+      const team = (ids, val, other) => `<div class="steam ${done && val > other ? 'win' : ''}">
+          <div class="snames">${ids.map(id => `<span>${esc(pname(id))}</span>`).join("")}</div>
+          ${withScore ? `<span class="sscore ${done ? '' : 'open'}">${done ? val : '–'}</span>` : ''}
+        </div>`;
+      return `<div class="smatch ${kind}">
+        <div class="slbl">${esc(label)}</div>
+        ${team(m.a, m.sa, m.sb)}
+        ${team(m.b, m.sb, m.sa)}
+      </div>`;
+    };
+    const boards = r.matches.map(m => board(m, courtName(m.court), "", true));
+    (r.rec ? r.rec.matches : []).forEach((m,k) => boards.push(board(m, (S.recCourtName||"Recreatieveld") + (r.rec.matches.length>1?' '+(k+1):''), "fun", true)));
+    (r.extra ? r.extra.matches : []).forEach(m => boards.push(board(m, S.restCourtName||"Rustveld", "extra", false)));
+    const resting = (r.rest||[]).concat(r.rec ? r.rec.rest : []).filter(id => !onExtra.has(id));
+    const t = roundStart(i);
+    return `<article class="sround ${st}">
+      <div class="shead"><b>Ronde ${i+1}</b>${t?`<span class="time">${t}</span>`:''}<span class="tag">${st}</span>${equalAfter[i]!==null?`<span class="eq">✓ iedereen ${equalAfter[i]}×</span>`:''}</div>
+      <div class="sboards">${boards.join("")}</div>
+      ${resting.length ? `<div class="srest"><span class="slbl">Rust</span>${resting.map(id=>`<span class="chip">${esc(pname(id))}</span>`).join("")}</div>` : ''}
+    </article>`;
+  };
+
+  // matrix
+  const pool = S.matrixPool === "rec" ? "rec" : "main";
+  const ids = S.players.filter(p => (pool==="rec") === !!p.rec && (p.active || stats[p.id].games)).map(p => p.id);
+  const key = S.matrixMode === "with" ? "partners" : "opps";
+  let mx = 1; ids.forEach(a => ids.forEach(b => { mx = Math.max(mx, stats[a][key][b]||0); }));
+  const short = id => esc(pname(id).slice(0,3));
+  const matrix = ids.length > 1 ? `<div class="tablewrap"><table class="matrix">
+    <thead><tr><th></th>${ids.map(id=>`<th title="${esc(pname(id))}">${short(id)}</th>`).join("")}</tr></thead>
+    <tbody>${ids.map(a => `<tr><th class="l">${esc(pname(a))}</th>${ids.map(b => {
+      if (a===b) return `<td class="self"></td>`;
+      const c = stats[a][key][b]||0;
+      return `<td class="${c===0?'zero':''}" style="--k:${Math.round(c/mx*55)}%">${c||'·'}</td>`; }).join("")}</tr>`).join("")}</tbody>
+  </table></div>` : `<p class="muted">Te weinig spelers in deze groep.</p>`;
+
+  const groupRows = S.players.filter(p => p.active || stats[p.id].games).map(p => {
+    const s = stats[p.id]; const others = S.players.filter(q => q.id!==p.id && !!q.rec === !!p.rec && (q.active || stats[q.id].games)).length;
+    return `<tr><td class="l name">${esc(p.name)}</td><td class="l">${p.rec?'Fun':'Tornooi'}</td><td class="main">${s.games}</td><td>${s.rests}</td>
+      <td>${Object.keys(s.partners).length}</td><td>${Object.keys(s.opps).length} / ${others}</td></tr>`;
+  }).join("");
+
+  $("#view-schema").innerHTML = `
+    <div class="stack" style="gap:4px"><h2>Schema</h2>
+      <span class="muted small">${total} rondes · ${esc(S.startTime)}–${esc(S.endTime)} · ${S.minutes} min spelen + ${S.changeMinutes} min wisselen</span></div>
+    <div class="panel vhide">
+      <div class="settings">
+        <label class="field">Start<input type="time" id="setStart" value="${esc(S.startTime)}"></label>
+        <label class="field">Einde<input type="time" id="setEnd" value="${esc(S.endTime)}"></label>
+        <label class="field">Speeltijd (min)<input type="number" id="setMinutes2" min="1" max="60" value="${S.minutes}"></label>
+        <label class="field">Wisseltijd (min)<input type="number" id="setChange" min="0" max="30" value="${S.changeMinutes}"></label>
+        <label class="field">Aantal rondes<input type="number" id="setRounds" min="0" max="60" value="${S.roundsOverride||''}" placeholder="automatisch: ${total}"></label>
+      </div>
+    </div>
+    <p class="muted small vhide" style="margin:0">Het schema gaat uit van wie nu aanwezig is. Zet je iemand aanwezig of afwezig, dan past de app de rondes die nog moeten komen automatisch aan. "Volgende ronde" volgt precies dit schema. ${tourIds.length ? 'Een groen vinkje betekent dat iedereen na die ronde evenveel gespeeld heeft: een goed moment om te stoppen.' : ''}</p>
+    <div class="row vhide"><button class="btn ghost" data-act="replan" ${plan.length?'':'disabled'}>Nieuw schema voor de komende rondes</button></div>
+    <div class="sgrid">${all.map(roundCard).join("") || '<p class="muted">Nog geen rondes. Voeg spelers toe.</p>'}</div>
+
+    <h2 style="margin-top:10px">Per speler</h2>
+    <p class="muted small" style="margin:0">Gespeelde en geplande rondes samen. Wedstrijden op het rustveld tellen niet mee.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th class="l">Naam</th><th class="l">Groep</th><th>Wedstr.</th><th>Rust</th><th>Partners</th><th>Tegenstanders</th></tr></thead>
+      <tbody>${groupRows}</tbody></table></div>
+    <p class="muted small" style="margin:0">Partners = met hoeveel verschillende mensen je samen speelt. Tegenstanders = tegen hoeveel verschillende mensen je speelt, van alle mogelijke.</p>
+
+    <h2 style="margin-top:10px">Wie met wie</h2>
+    <div class="row">
+      <div class="seg" role="group" aria-label="Groep">
+        <button data-act="matrix-pool" data-v="main" aria-pressed="${pool==='main'}">Tornooi</button>
+        <button data-act="matrix-pool" data-v="rec" aria-pressed="${pool==='rec'}">Recreatie</button></div>
+      <div class="seg" role="group" aria-label="Toon">
+        <button data-act="matrix-mode" data-v="opp" aria-pressed="${key==='opps'}">Tegen elkaar</button>
+        <button data-act="matrix-mode" data-v="with" aria-pressed="${key==='partners'}">Samen</button></div>
+    </div>
+    <p class="muted small" style="margin:0">Elk vakje toont hoe vaak twee spelers ${key==='opps'?'tegen elkaar':'samen in een team'} spelen. Een · betekent nog nooit.</p>
+    ${matrix}`;
+}
+
+function renderStand(){
+  const rows = ranking("main").filter(s => { const p = P(s.id); return !(p && p.rec) || s.played > 0; });
+  const recRows = ranking("rec").filter(s => s.played > 0);
+  const unequal = new Set(rows.filter(r=>S.players.find(p=>p.id===r.id)).map(r=>r.played)).size > 1;
+  const played = S.rounds.reduce((n,r)=>n+r.matches.filter(isScored).length,0);
+  const mainCol = S.rankBy==="total" ? "pf" : S.rankBy==="wins" ? "mp" : "avg";
+  const fmtAvg = v => v.toFixed(1).replace(".", ",");
+  $("#view-stand").innerHTML = `
+    <div class="row"><h2 class="grow">Stand</h2>
+      <label class="field" style="flex-direction:row;align-items:center;gap:8px">Rangschik op
+        <select id="setRank" style="width:auto">
+          <option value="avg" ${S.rankBy==="avg"?'selected':''}>Punten per match</option>
+          <option value="total" ${S.rankBy==="total"?'selected':''}>Totaal punten</option>
+          <option value="wins" ${S.rankBy==="wins"?'selected':''}>Overwinningen (3-1-0)</option>
+        </select></label></div>
+    <p class="muted small" style="margin:0">Iedereen krijgt individueel de punten van zijn team. ${unequal && S.rankBy==="total" ? '<b style="color:var(--warn)">Let op: niet iedereen speelde evenveel. "Punten per match" is eerlijker.</b>' : `${played} wedstrijden gespeeld.`}</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th class="l">#</th><th class="l">Naam</th><th>Gesp.</th><th>W</th><th>G</th><th>V</th><th>Ptn</th><th>Tegen</th><th>+/−</th><th>Gem.</th>${S.rankBy==="wins"?'<th>Wpt</th>':''}<th class="l">Speelde met</th></tr></thead>
+      <tbody>${rows.map((s,i) => `<tr class="p${i+1}">
+        <td class="l rank">${i+1}</td>
+        <td class="l name">${esc(pname(s.id))}</td>
+        <td>${s.played}</td><td>${s.w}</td><td>${s.d}</td><td>${s.l}</td>
+        <td class="${mainCol==='pf'?'main':''}">${s.pf}</td><td>${s.pa}</td><td>${s.diff>0?'+':''}${s.diff}</td>
+        <td class="${mainCol==='avg'?'main':''}">${fmtAvg(s.avg)}</td>
+        ${S.rankBy==="wins"?`<td class="main">${s.mp}</td>`:''}
+        <td class="l partners">${Object.entries(s.partners).map(([id,c])=>esc(pname(id))+(c>1?` <b style="color:var(--warn)">×${c}</b>`:'')).join(", ")||'–'}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>
+    <p class="muted small" style="margin:0">W = gewonnen · G = gelijk · V = verloren · Gem. = punten per match. Bij gelijke stand telt het saldo (+/−).</p>
+    ${recRows.length ? `
+    <h2 style="margin-top:10px">Recreatie</h2>
+    <p class="muted small" style="margin:0">Alleen de recreatiewedstrijden waarbij een score is ingevuld. Telt niet mee voor het tornooi.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th class="l">#</th><th class="l">Naam</th><th>Gesp.</th><th>W</th><th>G</th><th>V</th><th>Ptn</th><th>Tegen</th><th>+/−</th><th>Gem.</th></tr></thead>
+      <tbody>${recRows.map((s,i) => `<tr>
+        <td class="l rank">${i+1}</td><td class="l name">${esc(pname(s.id))}</td>
+        <td>${s.played}</td><td>${s.w}</td><td>${s.d}</td><td>${s.l}</td>
+        <td class="${mainCol==='pf'?'main':''}">${s.pf}</td><td>${s.pa}</td><td>${s.diff>0?'+':''}${s.diff}</td>
+        <td class="${mainCol==='avg'?'main':''}">${fmtAvg(s.avg)}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>` : ""}`;
+}
+
+/* ---------- Acties ---------- */
+let toastT;
+function toast(t){ const el=$("#toast"); el.textContent=t; el.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>el.hidden=true,2200); }
+function dropExampleFlag(){ if (S.example){ S.example = false; } }
+
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-act],[data-tab]");
+  if (!b || b.disabled) return;
+  if (b.dataset.tab){ tab = b.dataset.tab; confirmAction = null; try { sessionStorage.setItem("wp-tab", tab); } catch(e){} render(); window.scrollTo(0,0); return; }
+  const act = b.dataset.act, id = b.dataset.id;
+  if (VIEW && !["prev-round","next-view","goto-last","matrix-pool","matrix-mode"].includes(act)) return;
+  switch(act){
+    case "toggle-active": { const p=P(id); p.active=!p.active; save(); render(); break; }
+    case "toggle-rec": { const p=P(id); p.rec=!p.rec; save(); render(); break; }
+    case "level": { P(id).level = +b.dataset.level; save(); render(); break; }
+    case "del-player": {
+      const usedIn = S.rounds.some(r => r.matches.some(m => m.a.concat(m.b).includes(id)));
+      if (usedIn){ confirmAction = "del-player"; pendingDel = id; render(); }
+      else { S.players = S.players.filter(p=>p.id!==id); save(); render(); }
+      break;
+    }
+    case "bulk-add": {
+      const lines = $("#bulk").value.split(/\n/).map(s=>s.trim()).filter(Boolean);
+      const rec = $("#bulkRec").checked;
+      lines.forEach(line => { const m = line.match(/^(.*?)[\s,;]+([1-5])$/); const name=(m?m[1]:line).trim(); const level=m?+m[2]:3; if(name) S.players.push({id:uid(),name,level,active:true,rec}); });
+      if (lines.length){ dropExampleFlag(); save(); render(); toast(lines.length+" spelers toegevoegd"); }
+      break;
+    }
+    case "new-round": {
+      const r = nextRound();
+      if (!r){ toast("Te weinig aanwezige spelers"); break; }
+      S.rounds.push(r); afterRoundChange(); S.viewRound = null; timerReset(); save(); render(); window.scrollTo(0,0);
+      if (S.autoShare && (artifactCap || (ON_GH && ghToken()))) shareLive();
+      break;
+    }
+    case "reshuffle": {
+      S.rounds.pop(); const r = generateRound(); if (r) S.rounds.push(r); S.plan = null; S.viewRound=null; save(); render(); toast("Nieuwe indeling"); break;
+    }
+    case "share": shareLive(); break;
+    case "save-token": { const v = ($("#ghTokenInput").value || "").trim(); if (!v){ toast("Plak eerst je sleutel"); break; }
+      try { localStorage.setItem(GH_TOKEN_KEY, v); } catch(e){} toast("Sleutel bewaard op dit toestel"); render(); break; }
+    case "forget-token": try { localStorage.removeItem(GH_TOKEN_KEY); } catch(e){} toast("Sleutel gewist"); render(); break;
+    case "copy-link": { const box = $("#viewerLink"); const done = () => toast("Link gekopieerd");
+      try { navigator.clipboard.writeText(box.value).then(done, () => { box.select(); toast("Selecteer en kopieer de link"); }); } catch(e){ box.select(); } break; }
+    case "replan": ensurePlan(true); save(); render(); toast("Nieuw schema gemaakt"); break;
+    case "matrix-pool": S.matrixPool = b.dataset.v; save(); render(); break;
+    case "matrix-mode": S.matrixMode = b.dataset.v; save(); render(); break;
+    case "score": {
+      const m = poolMatches(S.rounds[+b.dataset.r], b.dataset.pool)[+b.dataset.m], k = b.dataset.k, d = +b.dataset.d;
+      const other = k==="sa" ? "sb" : "sa";
+      if (m[k]===null || m[k]===undefined) m[k] = d>0 ? 1 : 0; else m[k] = Math.max(0, m[k]+d);
+      if (m[other]===null || m[other]===undefined) m[other] = 0;
+      save(); render(); break;
+    }
+    case "clear-score": { const m = poolMatches(S.rounds[+b.dataset.r], b.dataset.pool)[+b.dataset.m]; m.sa=null; m.sb=null; save(); render(); break; }
+    case "prev-round": S.viewRound = currentRoundIndex()-1; render(); break;
+    case "next-view": S.viewRound = currentRoundIndex()+1; render(); break;
+    case "goto-last": S.viewRound = null; render(); break;
+    case "timer-start": timerStart(); break;
+    case "timer-pause": timerPause(); break;
+    case "timer-restart": timerReset(); timerStart(); break;
+    case "timer-reset": timerReset(); break;
+    case "ask-del-round": confirmAction="del-round"; render(); break;
+    case "ask-reset-rounds": confirmAction="reset-rounds"; render(); break;
+    case "ask-reset-all": confirmAction="reset-all"; render(); break;
+    case "import": confirmAction="import"; render(); break;
+    case "confirm-no": confirmAction=null; render(); break;
+    case "confirm-yes": {
+      const key = b.dataset.key; confirmAction = null;
+      if (key==="del-round"){ S.rounds.pop(); S.viewRound=null; timerReset(); }
+      if (key==="reset-rounds"){ S.rounds=[]; S.viewRound=null; timerReset(); }
+      if (key==="reset-all"){ S = baseState(); timerReset(); }
+      if (key==="del-player"){ S.players = S.players.filter(p=>p.id!==pendingDel);
+        S.rounds.forEach(r => { r.rest=(r.rest||[]).filter(x=>x!==pendingDel); r.matches = r.matches.filter(m => !m.a.concat(m.b).includes(pendingDel));
+          if (r.rec){ r.rec.rest = r.rec.rest.filter(x=>x!==pendingDel); r.rec.matches = r.rec.matches.filter(m => !m.a.concat(m.b).includes(pendingDel)); }
+          if (r.extra){ r.extra.matches = r.extra.matches.filter(m => !m.a.concat(m.b).includes(pendingDel)); } }); }
+      if (key==="import"){
+        try { const data = JSON.parse(decodeURIComponent(escape(atob($("#importBox").value.trim()))));
+          if (!data || !Array.isArray(data.players)) throw 0;
+          S = Object.assign(baseState(), data); toast("Back-up teruggezet");
+        } catch(err){ toast("Deze code klopt niet. Kopieer ze opnieuw volledig."); render(); return; }
+      }
+      save(); render(); break;
+    }
+    case "export": {
+      const code = btoa(unescape(encodeURIComponent(JSON.stringify(S))));
+      const box = $("#importBox");
+      const fallback = () => { box.value = code; box.select(); toast("Code staat in het vak: kopieer ze zelf"); };
+      try { navigator.clipboard.writeText(code).then(()=>toast("Back-upcode gekopieerd"), fallback); } catch(err){ fallback(); }
+      break;
+    }
+  }
+});
+let pendingDel = null;
+
+$("#clearExample").addEventListener("click", () => { S = baseState({courts:S.courts}); save(); tab="spelers"; render(); });
+
+document.addEventListener("submit", e => {
+  if (e.target.id !== "addForm") return;
+  e.preventDefault();
+  const name = $("#addName").value.trim(); if (!name) return;
+  S.players.push({id:uid(), name, level:+$("#addLevel").value, active:true, rec: $("#addRec").value === "1"});
+  dropExampleFlag(); save(); render();
+  const inp = $("#addName"); inp && inp.focus();
+});
+
+document.addEventListener("change", e => {
+  const t = e.target;
+  if (VIEW && t.id !== "setRank") return;
+  const num = (v,min,max,def) => { v = parseInt(v,10); return isNaN(v) ? def : Math.min(max, Math.max(min, v)); };
+  if (t.dataset.act === "from"){ P(t.dataset.id).from = +t.value; save(); render(); return; }
+  if (t.dataset.act === "rename"){ const p=P(t.dataset.id); const v=t.value.trim(); if (v){ p.name=v; save(); } else t.value=p.name; return; }
+  switch(t.id){
+    case "setName": S.name = t.value.trim() || "Tornooi"; break;
+    case "setTeam": S.teamSize = +t.value; break;
+    case "setCourts": S.courts = num(t.value,1,12,3); break;
+    case "setMinutes": case "setMinutes2": S.minutes = num(t.value,1,60,10); if (!T.running) timerReset(); break;
+    case "setWeight": S.levelWeight = +t.value; break;
+    case "setCourtNames": S.courtNames = t.value; break;
+    case "setRecCourts": S.recCourts = num(t.value,0,4,1); break;
+    case "setRecName": S.recCourtName = t.value.trim() || "Recreatieveld"; break;
+    case "setRestCourts": S.restCourts = +t.value; break;
+    case "setShowLevel": S.showLevel = t.checked; break;
+    case "setRank": S.rankBy = t.value; if (VIEW){ render(); return; } break;
+    case "setAutoShare": S.autoShare = t.checked; break;
+    case "setStart": if (toMin(t.value) !== null) S.startTime = t.value; break;
+    case "setEnd": if (toMin(t.value) !== null) S.endTime = t.value; break;
+    case "setChange": S.changeMinutes = num(t.value,0,30,3); break;
+    case "setRounds": S.roundsOverride = num(t.value,0,60,0); break;
+    default: return;
+  }
+  save(); render();
+});
+
+/* ---------- Start ---------- */
+try { const t = sessionStorage.getItem("wp-tab"); if (t) tab = t; } catch(e){}
+function startEditor(){
+  VIEW = false;
+  S = loadLocal();
+  S = S ? Object.assign(baseState(), S) : (LIVE ? Object.assign(baseState(), LIVE.state, {updatedAt: 0}) : exampleState()); // je account wint van de gedeelde kopie
+  if (S.example && !S.rounds.length){
+    // toon meteen een voorbeeldronde zodat je ziet hoe het werkt
+    const r = generateRound(); if (r){ S.rounds.push(r); S.rounds[0].matches[0].sa = 6; S.rounds[0].matches[0].sb = 4; }
+  }
+  try { const t = JSON.parse(localStorage.getItem(TKEY)); if (t){ T = t; if (T.running){ clearInterval(tick); tick = setInterval(updateClock, 250); } } } catch(e){}
+  render();
+  initCloud();
+}
+async function decideRole(){
+  // Wie mag bewerken (eigenaar of editor) krijgt de volledige app en kan delen
+  let canEdit = false;
+  try {
+    const user = window.claude && window.claude.use ? await window.claude.use("user") : null;
+    canEdit = user ? !!(await user.canEdit()) : false;
+    if (canEdit) artifactCap = await window.claude.use("artifact");
+  } catch(e){}
+  if (canEdit && VIEW) startEditor();
+  else if (canEdit) render(); // deelknop tonen
+}
+if (KIJK){ S = baseState(); render(); pollLive(); }
+else if (LIVE){ S = Object.assign(baseState(), LIVE.state); render(); decideRole(); }
+else { startEditor(); decideRole(); }
+})();
+</script>
+
+</body>
+</html>
