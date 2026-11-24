@@ -425,16 +425,32 @@ const viewerLink = () => location.origin + location.pathname + "?kijk";
 function ghPanel(){
   if (!ON_GH) return "";
   const has = !!ghToken();
-  return `<details class="panel" ${has ? "" : "open"}>
+  return `<details class="panel" ${has && !tokenStatus ? "" : "open"}>
     <summary>Delen met spelers</summary>
     <div class="stack">
       <p class="small" style="margin:0">Stuur deze link naar je spelers. Ze zien Ronde, Schema en Stand, zonder knoppen en zonder niveaus:</p>
       <div class="row"><input type="text" id="viewerLink" readonly value="${esc(viewerLink())}" class="grow" style="flex:1;min-width:0"><button class="btn" data-act="copy-link">Kopieer</button></div>
       <p class="small muted" style="margin:0">${has ? "Je sleutel is ingesteld op dit toestel. Met <b>Bijwerken voor spelers</b> (tabblad Ronde) zet je de stand online." : "Om de stand online te zetten, heeft de app eenmalig een sleutel (token) van GitHub nodig. Die blijft alleen op dit toestel."}</p>
       <div class="row"><input type="password" id="ghTokenInput" placeholder="${has ? "sleutel ingesteld ✓" : "plak hier je sleutel (github_pat_…)"}" autocomplete="off" class="grow" style="flex:1;min-width:0">
-        <button class="btn primary" data-act="save-token">Bewaar</button>${has ? `<button class="btn ghost" data-act="forget-token">Wis sleutel</button>` : ""}</div>
+        <button class="btn primary" data-act="save-token">Bewaar</button>${has ? `<button class="btn" data-act="test-token">Test</button><button class="btn ghost" data-act="forget-token">Wis sleutel</button>` : ""}</div>
+      ${tokenStatus ? `<p class="small" style="margin:0;font-weight:700;color:${tokenStatus.startsWith("✓") ? "var(--win)" : tokenStatus.startsWith("✗") ? "var(--danger)" : "var(--muted)"}">${esc(tokenStatus)}</p>` : ""}
     </div>
   </details>`;
+}
+let tokenStatus = "";
+async function testToken(){
+  tokenStatus = "Sleutel testen…"; render();
+  try {
+    const res = await fetch(`https://api.github.com/repos/${GH.owner}/${GH.repo}`, {headers: {Authorization: "Bearer " + ghToken(), Accept: "application/vnd.github+json"}, cache: "no-store"});
+    if (res.status === 401) tokenStatus = "✗ Deze sleutel klopt niet of is verlopen. Kopieer hem opnieuw volledig.";
+    else if (res.status === 404) tokenStatus = "✗ Deze sleutel heeft geen toegang tot " + GH.repo + ". Kies die repository bij het maken van de sleutel.";
+    else if (!res.ok) tokenStatus = "✗ GitHub antwoordt met fout " + res.status + ".";
+    else {
+      const d = await res.json();
+      tokenStatus = d.permissions && d.permissions.push ? "✓ Sleutel werkt: de app mag de stand bijwerken." : "✗ De sleutel mag alleen lezen. Zet 'Contents' op 'Read and write'.";
+    }
+  } catch(e){ tokenStatus = "✗ Geen verbinding met GitHub. Heb je internet?"; }
+  render();
 }
 let livePoll = null;
 async function pollLive(){
@@ -1122,8 +1138,9 @@ document.addEventListener("click", e => {
     }
     case "share": shareLive(); break;
     case "save-token": { const v = ($("#ghTokenInput").value || "").trim(); if (!v){ toast("Plak eerst je sleutel"); break; }
-      try { localStorage.setItem(GH_TOKEN_KEY, v); } catch(e){} toast("Sleutel bewaard op dit toestel"); render(); break; }
-    case "forget-token": try { localStorage.removeItem(GH_TOKEN_KEY); } catch(e){} toast("Sleutel gewist"); render(); break;
+      try { localStorage.setItem(GH_TOKEN_KEY, v); } catch(e){} render(); testToken(); break; }
+    case "test-token": testToken(); break;
+    case "forget-token": try { localStorage.removeItem(GH_TOKEN_KEY); } catch(e){} tokenStatus = ""; toast("Sleutel gewist"); render(); break;
     case "copy-link": { const box = $("#viewerLink"); const done = () => toast("Link gekopieerd");
       try { navigator.clipboard.writeText(box.value).then(done, () => { box.select(); toast("Selecteer en kopieer de link"); }); } catch(e){ box.select(); } break; }
     case "replan": ensurePlan(true); save(); render(); toast("Nieuw schema gemaakt"); break;
@@ -1231,16 +1248,20 @@ function startEditor(){
     const r = generateRound(); if (r){ S.rounds.push(r); S.rounds[0].matches[0].sa = 6; S.rounds[0].matches[0].sb = 4; }
   }
   try { const t = JSON.parse(localStorage.getItem(TKEY)); if (t){ T = t; if (T.running){ clearInterval(tick); tick = setInterval(updateClock, 250); } } } catch(e){}
-  // Link met "#import=<back-upcode>": tornooi met één tik overzetten (de code blijft op dit toestel)
-  if (location.hash.startsWith("#import=")){
-    pendingImport = decodeURIComponent(location.hash.slice(8));
-    try { history.replaceState(null, "", location.pathname + location.search); } catch(e){}
-    tab = "spelers"; confirmAction = "import";
-  }
   render();
-  if (confirmAction === "import"){ const c = document.querySelector(".confirm"); if (c) c.scrollIntoView({block: "center"}); }
+  checkImportHash();
   initCloud();
 }
+// Link met "#import=<back-upcode>": tornooi met één tik overzetten (de code blijft op dit toestel).
+// Ook als de pagina al openstond (dan verandert alleen het #-deel en herlaadt de pagina niet).
+function checkImportHash(){
+  if (VIEW || !location.hash.startsWith("#import=")) return;
+  pendingImport = decodeURIComponent(location.hash.slice(8));
+  try { history.replaceState(null, "", location.pathname + location.search); } catch(e){}
+  tab = "spelers"; confirmAction = "import"; render();
+  const c = document.querySelector(".confirm"); if (c) c.scrollIntoView({block: "center"});
+}
+window.addEventListener("hashchange", checkImportHash);
 async function decideRole(){
   // Wie mag bewerken (eigenaar of editor) krijgt de volledige app en kan delen
   let canEdit = false;
