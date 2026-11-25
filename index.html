@@ -552,8 +552,9 @@ function bestSplit(group, H, w){
   const lv = id => plevel(id);
   const evalTeams = (a,b) => {
     let c = 0;
-    for (let i=0;i<a.length;i++) for (let j=i+1;j<a.length;j++) c += 300 * H.partner(a[i],a[j]) ** 1.5;
-    for (let i=0;i<b.length;i++) for (let j=i+1;j<b.length;j++) c += 300 * H.partner(b[i],b[j]) ** 1.5;
+    // nieuwe partner gaat altijd voor op even sterke teams
+    for (let i=0;i<a.length;i++) for (let j=i+1;j<a.length;j++) c += 5000 * H.partner(a[i],a[j]) ** 1.5;
+    for (let i=0;i<b.length;i++) for (let j=i+1;j<b.length;j++) c += 5000 * H.partner(b[i],b[j]) ** 1.5;
     a.forEach(x => b.forEach(y => c += 30 * H.opp(x,y) + (H.prevOpp(x,y) ? 2000 : 0))); // nooit 2 rondes na elkaar tegen dezelfde
     const sa = a.reduce((s,id)=>s+lv(id),0), sb = b.reduce((s,id)=>s+lv(id),0);
     c += w * 18 * (sa-sb)**2;
@@ -668,7 +669,7 @@ function totalRounds(){
   return Math.max(1, Math.floor((b - a) / slot));
 }
 function roundStart(i){ const a = toMin(S.startTime); return a === null ? null : toClock(a + i*(S.minutes + S.changeMinutes)); }
-const PLAN_VERSION = 2;
+const PLAN_VERSION = 3;
 function planKey(){
   // Het schema blijft geldig zolang aanwezigen, niveaus, instellingen en gespeelde indelingen gelijk blijven
   return JSON.stringify([
@@ -681,15 +682,43 @@ function planKey(){
 function ensurePlan(force){
   const key = planKey();
   if (!force && S.plan && S.planKey === key) return;
-  const saved = S.rounds, plan = [];
-  S.rounds = saved.slice();
+  // Maak meerdere volledige schema's en hou het beste (ronde per ronde plannen mist soms iets)
+  const saved = S.rounds, t0 = Date.now();
+  let best = null;
   try {
-    for (let i = saved.length; i < totalRounds(); i++){
-      const r = generateRound(); if (!r) break;
-      S.rounds.push(r); plan.push(r);
+    for (let attempt = 0; attempt < 12 && (attempt < 3 || Date.now() - t0 < 2500); attempt++){
+      const plan = [];
+      S.rounds = saved.slice();
+      for (let i = saved.length; i < totalRounds(); i++){
+        const r = generateRound(); if (!r) break;
+        S.rounds.push(r); plan.push(r);
+      }
+      const score = planScore(saved.concat(plan));
+      if (!best || score < best.score) best = {score, plan};
+      if (score === 0) break;
     }
   } finally { S.rounds = saved; }
-  S.plan = plan; S.planKey = key;
+  S.plan = best ? best.plan : []; S.planKey = key;
+}
+// Hoe "fout" is een schema? Herhaalde partner > zelfde tegenstander na elkaar > dubbel rusten > ongelijke teams.
+function planScore(rounds){
+  const k = (a,b) => a < b ? a+"|"+b : b+"|"+a, partner = {};
+  let score = 0;
+  rounds.forEach((r, i) => {
+    const ms = r.matches.concat(r.rec ? r.rec.matches : []);
+    ms.forEach(m => [m.a, m.b].forEach(t => { for (let x=0;x<t.length;x++) for (let y=x+1;y<t.length;y++){ const kk = k(t[x],t[y]); partner[kk] = (partner[kk]||0) + 1; } }));
+    r.matches.forEach(m => { const d = m.a.reduce((s,id)=>s+plevel(id),0) - m.b.reduce((s,id)=>s+plevel(id),0); score += S.levelWeight * d * d; });
+    if (!i) return;
+    const prev = rounds[i-1], po = {};
+    prev.matches.concat(prev.rec ? prev.rec.matches : []).forEach(m => m.a.forEach(x => m.b.forEach(y => po[k(x,y)] = 1)));
+    ms.forEach(m => m.a.forEach(x => m.b.forEach(y => { if (po[k(x,y)]) score += 1000; })));
+    const pr = new Set((prev.rest||[]).concat(prev.rec ? prev.rec.rest : []));
+    (r.rest||[]).concat(r.rec ? r.rec.rest : []).forEach(id => { const p = P(id); if (pr.has(id) && !(p && (p.from||1) > i)) score += 500; });
+  });
+  // herhaalde partners: alleen het tornooi telt zwaar (bij 5 recreanten is herhalen onvermijdelijk)
+  const fun = new Set(S.players.filter(p => p.rec).map(p => p.id));
+  Object.entries(partner).forEach(([kk, n]) => { if (n > 1) score += (fun.has(kk.split("|")[0]) ? 50 : 10000) * (n - 1); });
+  return score;
 }
 function nextRound(){
   ensurePlan(false);
