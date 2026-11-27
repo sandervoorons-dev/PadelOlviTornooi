@@ -177,6 +177,14 @@ td.name{font-weight:700}
 .viewer .row:has(> [data-act="new-round"]){display:none}
 .viewer #view-ronde > p.small,.viewer .court.rec .fun-note{display:none}
 
+/* Thuis / uit */
+.ha{align-self:flex-start;font-family:var(--font-display);font-weight:700;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;border-radius:999px;padding:2px 8px;margin-bottom:3px}
+.ha.home{background:var(--court);color:#fff}
+.ha.away{background:var(--chip);color:var(--muted)}
+.ha-s{font-family:var(--font-display);font-weight:700;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase}
+.ha-s.home{color:var(--court)}
+.ha-s.away{color:var(--muted)}
+
 /* Schema */
 .sgrid{display:flex;flex-direction:column;gap:12px}
 .sround{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
@@ -469,6 +477,42 @@ async function pollLive(){
   clearTimeout(livePoll); livePoll = setTimeout(pollLive, 30000);
 }
 
+/* ---------- Thuis / uit ----------
+   Thuis serveert eerst. Eerlijk verdeeld: per wedstrijd is het team thuis dat samen het minst
+   thuis was. Volledig afgeleid uit het schema, zodat eigenaar en kijkers hetzelfde zien. */
+function homeSides(){
+  // Gestarte rondes hebben een vaste thuis/uit (m.home). Voor de geplande rondes zoeken we de
+  // verdeling waarbij iedereen ongeveer even vaak thuis als uit is. Alles volgt uit de gegevens,
+  // dus eigenaar en kijkers zien hetzelfde.
+  const bal = {}, sides = new Map();
+  const add = (m, side, d) => { m.a.forEach(id => bal[id] = (bal[id]||0) + (side === "a" ? d : -d)); m.b.forEach(id => bal[id] = (bal[id]||0) + (side === "b" ? d : -d)); };
+  const sum = ids => ids.reduce((t, id) => t + (bal[id] || 0), 0);
+  const all = r => r.matches.concat(r.rec ? r.rec.matches : []);
+  S.rounds.forEach(r => all(r).forEach(m => {
+    const side = m.home || (sum(m.a) <= sum(m.b) ? "a" : "b");
+    sides.set(m, side); add(m, side, 1);
+  }));
+  const planned = [];
+  (S.plan || []).forEach(r => all(r).forEach(m => {
+    const side = sum(m.a) <= sum(m.b) ? "a" : "b";
+    sides.set(m, side); add(m, side, 1); planned.push(m);
+  }));
+  // verbeteren: een wedstrijd omdraaien als dat de totale scheefheid verkleint
+  for (let pass = 0, better = true; better && pass < 30; pass++){
+    better = false;
+    planned.forEach(m => {
+      const before = m.a.concat(m.b).reduce((t, id) => t + bal[id] * bal[id], 0);
+      const side = sides.get(m), other = side === "a" ? "b" : "a";
+      add(m, side, -1); add(m, other, 1);
+      const after = m.a.concat(m.b).reduce((t, id) => t + bal[id] * bal[id], 0);
+      if (after < before){ sides.set(m, other); better = true; }
+      else { add(m, other, -1); add(m, side, 1); }
+    });
+  }
+  return sides;
+}
+const haBadge = home => `<span class="ha ${home ? "home" : "away"}">${home ? "Thuis · serveert eerst" : "Uit"}</span>`;
+
 /* ---------- Helpers ---------- */
 const P = id => S.players.find(p => p.id === id);
 const pname = id => (P(id) || {name:"?"}).name;
@@ -722,7 +766,11 @@ function planScore(rounds){
 }
 function nextRound(){
   ensurePlan(false);
-  if (S.plan && S.plan.length) return JSON.parse(JSON.stringify(S.plan.shift()));
+  if (S.plan && S.plan.length){
+    const HS = homeSides(), r = S.plan[0];
+    r.matches.concat(r.rec ? r.rec.matches : []).forEach(m => m.home = HS.get(m));
+    return JSON.parse(JSON.stringify(S.plan.shift()));
+  }
   return generateRound(); // voorbij het geplande aantal rondes: gewoon verder indelen
 }
 function afterRoundChange(){ S.planKey = planKey(); } // rest van het schema blijft geldig
@@ -910,17 +958,24 @@ function renderRound(){
   const anyScored = r.matches.some(isScored) || (r.rec ? r.rec.matches.some(isScored) : false);
   const openCount = r.matches.filter(m=>!isScored(m)).length;
   const lvlTxt = id => S.showLevel ? `<span class="lv">niveau ${plevel(id)}</span>` : "";
+  const HS = homeSides();
   const side = (m, k, ids, val, other, pool) => {
     const win = isScored(m) && val > other;
+    const home = HS.get(m) === (k === "sa" ? "a" : "b");
     const idx = poolMatches(r, pool||"main").indexOf(m);
     const attrs = `data-act="score" data-pool="${pool||'main'}" data-r="${ri}" data-m="${idx}" data-k="${k}"`;
     return `<div class="side ${win?'winner':''}">
-      <div class="names">${ids.map(id=>`<span class="n">${esc(pname(id))}</span>${lvlTxt(id)}`).join("")}</div>
+      <div class="names">${haBadge(home)}${ids.map(id=>`<span class="n">${esc(pname(id))}</span>${lvlTxt(id)}`).join("")}</div>
       <div class="stepper">
         <button ${attrs} data-d="-1" aria-label="Min">−</button>
         <span class="val ${val===null||val===undefined?'empty':''}">${val===null||val===undefined?'–':val}</span>
         <button ${attrs} data-d="1" aria-label="Plus">+</button>
       </div></div>`;
+  };
+  // thuisteam altijd bovenaan
+  const bothSides = (m, pool) => {
+    const A = side(m,"sa",m.a,m.sa,m.sb,pool), B = side(m,"sb",m.b,m.sb,m.sa,pool);
+    return (HS.get(m) === "b" ? [B, A] : [A, B]).join('<div class="vs"><span>tegen</span></div>');
   };
   el.innerHTML = `${shareBar()}
     <div class="roundhead">
@@ -938,9 +993,7 @@ function renderRound(){
     <div class="courts">${r.matches.map(m => `
       <article class="court ${isScored(m)?'scored':''}">
         <div class="court-head"><span>${esc(courtName(m.court))}</span><span class="state">${isScored(m)?'score genoteerd':'bezig'}</span></div>
-        ${side(m,"sa",m.a,m.sa,m.sb)}
-        <div class="vs"><span>tegen</span></div>
-        ${side(m,"sb",m.b,m.sb,m.sa)}
+        ${bothSides(m)}
         <div class="court-foot">${isScored(m)?`<button class="linkbtn" data-act="clear-score" data-r="${ri}" data-m="${r.matches.indexOf(m)}">score wissen</button>`:''}</div>
       </article>`).join("")}
     </div>
@@ -960,9 +1013,7 @@ function renderRound(){
         h += `<div class="courts">${r.rec.matches.map((m,i) => `
       <article class="court rec">
         <div class="court-head"><span>${esc((S.recCourtName||"Recreatieveld") + (r.rec.matches.length>1?' '+(i+1):''))}</span><span class="state">${isScored(m)?'score genoteerd':'voor de fun'}</span></div>
-        ${side(m,"sa",m.a,m.sa,m.sb,"rec")}
-        <div class="vs"><span>tegen</span></div>
-        ${side(m,"sb",m.b,m.sb,m.sa,"rec")}
+        ${bothSides(m,"rec")}
         <p class="fun-note">Score invullen mag, hoeft niet. Telt apart in de recreatiestand.${isScored(m)?` <button class="linkbtn" data-act="clear-score" data-pool="rec" data-r="${ri}" data-m="${i}">score wissen</button>`:''}</p>
       </article>`).join("")}</div>`;
         h += chips(r.rec.rest, "Rust (recreatie)");
@@ -1027,19 +1078,19 @@ function renderSchema(){
     (r.rest||[]).concat(r.rec ? r.rec.rest : []).forEach(id => { if (stats[id]) stats[id].rests++; });
   });
 
+  const HS = homeSides();
   const roundCard = ({r, st}, i) => {
     const onExtra = new Set((r.extra ? r.extra.matches : []).flatMap(m => m.a.concat(m.b)));
     // één scorebordje per wedstrijd: namen onder elkaar, score rechts
     const board = (m, label, kind, withScore) => {
       const done = withScore && isScored(m);
       const team = (ids, val, other) => `<div class="steam ${done && val > other ? 'win' : ''}">
-          <div class="snames">${ids.map(id => `<span>${esc(pname(id))}</span>`).join("")}</div>
+          <div class="snames">${withScore ? `<span class="ha-s ${(HS.get(m) === "a") === (ids === m.a) ? "home" : "away"}">${(HS.get(m) === "a") === (ids === m.a) ? "Thuis" : "Uit"}</span>` : ""}${ids.map(id => `<span>${esc(pname(id))}</span>`).join("")}</div>
           ${withScore ? `<span class="sscore ${done ? '' : 'open'}">${done ? val : '–'}</span>` : ''}
         </div>`;
       return `<div class="smatch ${kind}">
         <div class="slbl">${esc(label)}</div>
-        ${team(m.a, m.sa, m.sb)}
-        ${team(m.b, m.sb, m.sa)}
+        ${HS.get(m) === "b" && withScore ? team(m.b, m.sb, m.sa) + team(m.a, m.sa, m.sb) : team(m.a, m.sa, m.sb) + team(m.b, m.sb, m.sa)}
       </div>`;
     };
     const boards = r.matches.map(m => board(m, courtName(m.court), "", true));
